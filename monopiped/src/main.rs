@@ -39,12 +39,9 @@ const BACKEND_HOST: &str = "localhost";
 const BACKEND_PORT: u16 = 22;
 
 fn proxy_connection(client_stream: TcpStream) {
-    match client_stream.set_nonblocking(true) {
-        Ok(_) => {},
-        Err(e) => {
-            error!("Error setting client connection to non-blocking (not proceeding): {:?}", e);
-            return;
-        }
+    if let Err(e) =  client_stream.set_nonblocking(true) {
+        error!("Error setting client connection to non-blocking (not proceeding): {:?}", e);
+        return;
     }
 
     let backend_stream = match TcpStream::connect((BACKEND_HOST, BACKEND_PORT)) {
@@ -58,12 +55,9 @@ fn proxy_connection(client_stream: TcpStream) {
         }
     };
 
-    match backend_stream.set_nonblocking(true) {
-        Ok(_) => {},
-        Err(e) => {
-            error!("Error setting backend connection to non-blocking (not proceeding): {:?}", e);
-            return;
-        }
+    if let Err(e) =  backend_stream.set_nonblocking(true) {
+        error!("Error setting backend connection to non-blocking (not proceeding): {:?}", e);
+        return;
     }
 
 
