@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 popol = "3.0.0"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
