@@ -39,8 +39,11 @@ const BACKEND_HOST: &str = "localhost";
 const BACKEND_PORT: u16 = 22;
 
 fn proxy_connection(client_stream: TcpStream) {
-    if let Err(e) =  client_stream.set_nonblocking(true) {
-        error!("Error setting client connection to non-blocking (not proceeding): {:?}", e);
+    if let Err(e) = client_stream.set_nonblocking(true) {
+        error!(
+            "Error setting client connection to non-blocking (not proceeding): {:?}",
+            e
+        );
         return;
     }
 
@@ -55,11 +58,13 @@ fn proxy_connection(client_stream: TcpStream) {
         }
     };
 
-    if let Err(e) =  backend_stream.set_nonblocking(true) {
-        error!("Error setting backend connection to non-blocking (not proceeding): {:?}", e);
+    if let Err(e) = backend_stream.set_nonblocking(true) {
+        error!(
+            "Error setting backend connection to non-blocking (not proceeding): {:?}",
+            e
+        );
         return;
     }
-
 
     let mut sources = popol::Sources::with_capacity(2);
     let mut events = Vec::with_capacity(2);
