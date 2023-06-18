@@ -4,10 +4,15 @@ use std::os::unix::io::AsRawFd;
 use std::process;
 use std::thread;
 
-use tracing::{info, error, debug};
+use tracing::{debug, error, info};
 
 fn main() {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .compact()
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let listener = match TcpListener::bind("0.0.0.0:31337") {
         Ok(listener) => listener,
