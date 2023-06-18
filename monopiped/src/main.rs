@@ -20,12 +20,20 @@ struct Args {
     target: String,
 }
 
+use tracing_subscriber::filter::{EnvFilter, LevelFilter};
+
+fn default_env() -> EnvFilter {
+    EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy()
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .compact()
         .with_target(false)
         .with_thread_ids(true)
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(default_env())
         .init();
 
     let args = Args::parse();
