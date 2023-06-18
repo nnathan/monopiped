@@ -94,7 +94,7 @@ fn proxy_connection(client_stream: TcpStream) {
             }
         }
 
-        debug!("draining {:?} events", events.len());
+        debug!("draining {} events", events.len());
 
         for event in events.drain(..) {
             debug!("received event {:?}", event);
@@ -118,24 +118,27 @@ fn proxy_connection(client_stream: TcpStream) {
             if event.is_readable() {
                 let source: &TcpStream;
                 let sink: &TcpStream;
-                let kind: &str;
+                let source_kind: &str;
+                let sink_kind: &str;
 
                 if event.as_raw_fd() == backend_stream.as_raw_fd() {
-                    debug!("source is backend, sink is client");
                     source = &backend_stream;
                     sink = &client_stream;
-                    kind = "backend";
+                    source_kind = "backend";
+                    sink_kind = "client";
                 } else {
-                    debug!("source is client, sink is backend");
                     source = &client_stream;
                     sink = &backend_stream;
-                    kind = "client";
+                    source_kind = "client";
+                    sink_kind = "backend";
                 }
+
+                debug!("source is {}, sink is {}", source_kind, sink_kind);
 
                 match shovel(source, sink) {
                     Ok(eof) => {
                         if eof {
-                            info!("{} connection closed", kind);
+                            info!("{} connection closed", source_kind);
                             return;
                         }
                     }
@@ -156,7 +159,7 @@ fn shovel(mut source: &TcpStream, mut sink: &TcpStream) -> Result<bool, std::io:
         debug!("before read");
         let n = match source.read(&mut buffer) {
             Ok(n) => {
-                debug!("read {:?} bytes", n);
+                debug!("read {} bytes", n);
                 n
             }
             Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(false),
@@ -173,6 +176,6 @@ fn shovel(mut source: &TcpStream, mut sink: &TcpStream) -> Result<bool, std::io:
             Err(e) => return Err(e),
         };
 
-        debug!("wrote {:?} bytes", n);
+        debug!("wrote {} bytes", n);
     }
 }
