@@ -6,6 +6,20 @@ use std::thread;
 
 use tracing::{debug, error, info};
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Listen address
+    #[arg(short, long)]
+    listener: String,
+
+    /// Target backend address
+    #[arg(short, long)]
+    target: String,
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .compact()
@@ -14,23 +28,28 @@ fn main() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let listener = match TcpListener::bind("0.0.0.0:31337") {
+    let args = Args::parse();
+    let listener_addr = args.listener.as_str();
+
+    let listener = match TcpListener::bind(listener_addr) {
         Ok(listener) => listener,
         Err(e) => {
-            error!("Failed to bind to port 31337: {:?}", e);
+            error!("Failed to listen on {} {:?}", listener_addr, e);
             process::exit(1);
         }
     };
 
-    info!("Server listening on port 31337");
+    info!("Listening on {}", listener_addr);
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 info!("New connection: {:?}", stream.peer_addr().unwrap());
 
-                thread::spawn(|| {
-                    proxy_connection(stream);
+                let target = args.target.clone();
+
+                thread::spawn(move || {
+                    proxy_connection(stream, target.as_str());
                 });
             }
             Err(e) => {
@@ -40,10 +59,7 @@ fn main() {
     }
 }
 
-const BACKEND_HOST: &str = "localhost";
-const BACKEND_PORT: u16 = 22;
-
-fn proxy_connection(client_stream: TcpStream) {
+fn proxy_connection(client_stream: TcpStream, target: &str) {
     if let Err(e) = client_stream.set_nonblocking(true) {
         error!(
             "Error setting client connection to non-blocking (not proceeding): {:?}",
@@ -52,9 +68,9 @@ fn proxy_connection(client_stream: TcpStream) {
         return;
     }
 
-    let backend_stream = match TcpStream::connect((BACKEND_HOST, BACKEND_PORT)) {
+    let backend_stream = match TcpStream::connect(target) {
         Ok(backend_stream) => {
-            info!("Connected to backend: {}:{}", BACKEND_HOST, BACKEND_PORT);
+            info!("Connected to backend: {}", target);
             backend_stream
         }
         Err(e) => {
