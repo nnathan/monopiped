@@ -2,6 +2,7 @@ use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
 use std::process;
+use std::thread;
 
 use tracing::{info, error, debug};
 
@@ -23,7 +24,9 @@ fn main() {
             Ok(stream) => {
                 info!("New connection: {:?}", stream.peer_addr().unwrap());
 
-                proxy_connection(stream);
+                thread::spawn(|| {
+                    proxy_connection(stream);
+                });
             }
             Err(e) => {
                 error!("Error accepting connection: {}", e);
