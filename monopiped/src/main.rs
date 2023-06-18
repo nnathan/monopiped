@@ -91,26 +91,17 @@ fn proxy_connection(client_stream: TcpStream) {
 
             if event.is_invalid() {
                 /* fd was probably not opened first */
-                error!(
-                    "received invalid event (not proceeding): {:?}",
-                    event
-                );
+                error!("received invalid event (not proceeding): {:?}", event);
                 return;
             }
 
             if event.is_error() {
-                eprintln!(
-                    "received error in event (not proceeding): {:?}",
-                    event
-                );
+                error!("received error in event (not proceeding): {:?}", event);
                 return;
             }
 
             if event.is_hangup() {
-                eprintln!(
-                    "received hangup in event (not proceeding): {:?}",
-                    event
-                );
+                error!("received hangup in event (not proceeding): {:?}", event);
                 return;
             }
 
@@ -133,8 +124,8 @@ fn proxy_connection(client_stream: TcpStream) {
 
                 match shovel(source, sink) {
                     Ok(eof) => {
-                        info!("{} connection closed", kind);
                         if eof {
+                            info!("{} connection closed", kind);
                             return;
                         }
                     }
