@@ -4,7 +4,7 @@ use std::os::unix::io::AsRawFd;
 use std::process;
 use std::thread;
 
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use clap::Parser;
 
@@ -52,7 +52,14 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                info!("New connection: {:?}", stream.peer_addr().unwrap());
+                match stream.peer_addr() {
+                    Ok(peer_addr) => {
+                        info!("New connection: {}", peer_addr);
+                    }
+                    Err(e) => {
+                        warn!("New connection: <error getting peer address>: {:?}", e);
+                    }
+                };
 
                 let target = args.target.clone();
 
