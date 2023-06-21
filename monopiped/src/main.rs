@@ -131,7 +131,7 @@ fn proxy_connection(client_stream: TcpStream, target: &str) {
             debug!("received event {:?}", event);
 
             if event.is_invalid() {
-                /* fd was probably not opened first */
+                // fd was probably not opened first
                 error!("received invalid event (not proceeding): {:?}", event);
                 return;
             }
@@ -197,7 +197,7 @@ fn shovel(mut source: &TcpStream, mut sink: &TcpStream) -> Result<bool, std::io:
             Err(e) => return Err(e),
         };
 
-        /* when read() returns 0 it means EOF / closed connection */
+        // when read() returns 0 it means EOF / closed connection
         if n == 0 {
             return Ok(true);
         }
