@@ -202,10 +202,7 @@ fn shovel(mut source: &TcpStream, mut sink: &TcpStream) -> Result<bool, std::io:
             return Ok(true);
         }
 
-        match sink.write_all(&buffer[..n]) {
-            Ok(_) => {}
-            Err(e) => return Err(e),
-        };
+        sink.write_all(&buffer[..n])?;
 
         debug!("wrote {} bytes", n);
     }
