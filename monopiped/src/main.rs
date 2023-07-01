@@ -146,37 +146,40 @@ fn proxy_connection(client_stream: TcpStream, target: &str) {
                 return;
             }
 
-            if event.is_readable() {
-                let source: &TcpStream;
-                let sink: &TcpStream;
-                let source_kind: &str;
-                let sink_kind: &str;
+            if !event.is_readable() {
+                debug!("received event but not readable: {:?}", event);
+                continue;
+            }
 
-                if event.as_raw_fd() == backend_stream.as_raw_fd() {
-                    source = &backend_stream;
-                    sink = &client_stream;
-                    source_kind = "backend";
-                    sink_kind = "client";
-                } else {
-                    source = &client_stream;
-                    sink = &backend_stream;
-                    source_kind = "client";
-                    sink_kind = "backend";
-                }
+            let source: &TcpStream;
+            let sink: &TcpStream;
+            let source_kind: &str;
+            let sink_kind: &str;
 
-                debug!("source is {}, sink is {}", source_kind, sink_kind);
+            if event.as_raw_fd() == backend_stream.as_raw_fd() {
+                source = &backend_stream;
+                sink = &client_stream;
+                source_kind = "backend";
+                sink_kind = "client";
+            } else {
+                source = &client_stream;
+                sink = &backend_stream;
+                source_kind = "client";
+                sink_kind = "backend";
+            }
 
-                match shovel(source, sink) {
-                    Ok(eof) => {
-                        if eof {
-                            info!("{} connection closed", source_kind);
-                            return;
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error shovelling data: {:?}", e);
+            debug!("source is {}, sink is {}", source_kind, sink_kind);
+
+            match shovel(source, sink) {
+                Ok(eof) => {
+                    if eof {
+                        info!("{} connection closed", source_kind);
                         return;
                     }
+                }
+                Err(e) => {
+                    error!("Error shovelling data: {:?}", e);
+                    return;
                 }
             }
         }
