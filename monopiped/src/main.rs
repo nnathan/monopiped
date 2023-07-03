@@ -1,12 +1,16 @@
 use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
+use std::path::PathBuf;
 use std::process;
 use std::thread;
 
 use tracing::{debug, error, info, warn};
 
 use clap::Parser;
+
+use crate::utils::crypto_hash_file;
+mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -18,6 +22,10 @@ struct Args {
     /// Target backend address
     #[arg(short, long, value_name = "ADDR:PORT")]
     target: String,
+
+    /// Key material
+    #[arg(short, long, value_name = "FILE")]
+    key: PathBuf,
 }
 
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
@@ -37,6 +45,16 @@ fn main() {
         .init();
 
     let args = Args::parse();
+
+    let master_key = match crypto_hash_file(&args.key) {
+        Ok(k) => k,
+        Err(e) => {
+            let p = args.key.into_os_string().into_string().unwrap();
+            error!("Failed to derive key from key file {}: {:?}", p, e);
+            process::exit(1);
+        }
+    };
+
     let listener_addr = args.listener.as_str();
 
     let listener = match TcpListener::bind(listener_addr) {
