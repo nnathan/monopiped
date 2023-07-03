@@ -12,11 +12,11 @@ use clap::Parser;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Listen address
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "ADDR:PORT")]
     listener: String,
 
     /// Target backend address
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "ADDR:PORT")]
     target: String,
 }
 
