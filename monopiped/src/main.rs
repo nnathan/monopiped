@@ -7,14 +7,27 @@ use std::thread;
 
 use tracing::{debug, error, info, warn};
 
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 
-use crate::utils::crypto_hash_file;
+use crate::utils::{crypto_hash_file, derive_keys};
 mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
+#[clap(group(
+            ArgGroup::new("mode")
+                .required(true)
+                .args(&["encrypt", "decrypt"]),
+        ))]
 struct Args {
+    /// Take unencrypted connections from listener and send encryption connections to target
+    #[arg(short, long)]
+    encrypt: bool,
+
+    /// Take encrypted connections from listener and send unencrypted connections to target
+    #[arg(short, long)]
+    decrypt: bool,
+
     /// Listen address
     #[arg(short, long, value_name = "ADDR:PORT")]
     listener: String,
@@ -55,6 +68,8 @@ fn main() {
         }
     };
 
+    let (client_key, server_key) = derive_keys(&master_key);
+
     let listener_addr = args.listener.as_str();
 
     let listener = match TcpListener::bind(listener_addr) {
@@ -82,7 +97,13 @@ fn main() {
                 let target = args.target.clone();
 
                 thread::spawn(move || {
-                    proxy_connection(stream, target.as_str());
+                    proxy_connection(
+                        stream,
+                        target.as_str(),
+                        args.encrypt,
+                        &client_key,
+                        &server_key,
+                    );
                 });
             }
             Err(e) => {
@@ -92,7 +113,13 @@ fn main() {
     }
 }
 
-fn proxy_connection(client_stream: TcpStream, target: &str) {
+fn proxy_connection(
+    client_stream: TcpStream,
+    target: &str,
+    client: bool,
+    client_key: &[u8; 32],
+    server_key: &[u8; 32],
+) {
     if let Err(e) = client_stream.set_nonblocking(true) {
         error!(
             "Error setting client connection to non-blocking (not proceeding): {:?}",
@@ -101,6 +128,8 @@ fn proxy_connection(client_stream: TcpStream, target: &str) {
         return;
     }
 
+    // if client, connect to backend, complete handshake, and shovel
+    // if server, complete handshake, connect to backend, and shovel
     let backend_stream = match TcpStream::connect(target) {
         Ok(backend_stream) => {
             info!("Connected to backend: {}", target);
