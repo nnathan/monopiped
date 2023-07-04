@@ -128,7 +128,7 @@ fn proxy_connection(
 ) {
     if let Err(e) = client_stream.set_nonblocking(true) {
         error!(
-            "Error setting client connection to non-blocking (not proceeding): {:?}",
+            "Error setting client connection to non-blocking (aborting): {:?}",
             e
         );
         return;
@@ -145,14 +145,14 @@ fn proxy_connection(
             backend_stream
         }
         Err(e) => {
-            error!("Failed to connect to backend (not proceeding): {}", e);
+            error!("Failed to connect to backend (aborting): {}", e);
             return;
         }
     };
 
     if let Err(e) = backend_stream.set_nonblocking(true) {
         error!(
-            "Error setting backend connection to non-blocking (not proceeding): {:?}",
+            "Error setting backend connection to non-blocking (aborting): {:?}",
             e
         );
         return;
@@ -200,7 +200,7 @@ fn proxy_connection(
             pk
         }
         Err(e) if e.kind() == ErrorKind::TimedOut => {
-            error!("Poll timeout waiting for handshake to complete (not proceeding)");
+            error!("Poll timeout waiting for handshake to complete (aborting)");
             return;
         }
         Err(e) => {
@@ -212,20 +212,20 @@ fn proxy_connection(
     let mut received_pk = [0u8; 32];
 
     if crypto_secretbox_open_easy(&mut received_pk, &encrypted_pk, &nonce, &rx_key).is_err() {
-        error!("Failed to decrypted encrypted public key (not proceeding): authentication failure");
+        error!("Failed to decrypted encrypted public key (aborting): authentication failure");
         return;
     }
 
     if client {
         if crypto_kx_client_session_keys(&mut rx_key, &mut tx_key, &pk, &sk, &received_pk).is_err()
         {
-            error!("Failed to perform key exchange (not proceeding)");
+            error!("Failed to perform key exchange (aborting)");
             return;
         }
     } else if crypto_kx_server_session_keys(&mut rx_key, &mut tx_key, &pk, &sk, &received_pk)
         .is_err()
     {
-        error!("Failed to perform key exchange (not proceeding)");
+        error!("Failed to perform key exchange (aborting)");
         return;
     }
 
@@ -259,17 +259,17 @@ fn proxy_connection(
 
             if event.is_invalid() {
                 // fd was probably not opened first
-                error!("received invalid event (not proceeding): {:?}", event);
+                error!("received invalid event (aborting): {:?}", event);
                 return;
             }
 
             if event.is_error() {
-                error!("received error in event (not proceeding): {:?}", event);
+                error!("received error in event (aborting): {:?}", event);
                 return;
             }
 
             if event.is_hangup() {
-                error!("received hangup in event (not proceeding): {:?}", event);
+                error!("received hangup in event (aborting): {:?}", event);
                 return;
             }
 
