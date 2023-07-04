@@ -12,8 +12,9 @@ use clap::{ArgGroup, Parser};
 use dryoc::classic::crypto_kx::*;
 use dryoc::classic::crypto_secretbox::{crypto_secretbox_easy, crypto_secretbox_open_easy};
 use dryoc::constants::CRYPTO_SECRETBOX_MACBYTES;
+use dryoc::classic::crypto_kdf::*;
 
-use crate::utils::{crypto_hash_file, derive_keys};
+use crate::utils::crypto_hash_file;
 mod utils;
 
 #[derive(Parser, Debug)]
@@ -70,6 +71,17 @@ fn main() {
             error!("Failed to derive key from key file {}: {:?}", p, e);
             process::exit(1);
         }
+    };
+
+    let derive_keys = |k: &[u8; 32]| {
+        let context: [u8; 8] = [0; 8];
+        let mut client_key: [u8; 32] = [0; 32];
+        let mut server_key: [u8; 32] = [0; 32];
+        crypto_kdf_derive_from_key(&mut client_key, 0, &context, k)
+            .expect("client key kdf failed");
+        crypto_kdf_derive_from_key(&mut server_key, 1, &context, k)
+            .expect("server key kdf failed");
+        (client_key, server_key)
     };
 
     let (client_key, server_key) = derive_keys(&master_key);
