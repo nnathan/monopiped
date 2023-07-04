@@ -440,14 +440,14 @@ fn shovel(
     conn_ctx: &mut ConnectionContext,
 ) -> Result<bool, std::io::Error> {
     match (source_is_backend, is_client) {
-        (false, false) => server_shovel_client_to_backend(source, sink, conn_ctx),
-        (false, true) => client_shovel_client_to_backend(source, sink, conn_ctx),
-        (true, false) => server_shovel_backend_to_client(source, sink, conn_ctx),
-        (true, true) => client_shovel_backend_to_client(source, sink, conn_ctx),
+        (false, false) => shovel_decrypted(source, sink, conn_ctx),
+        (false, true) => shovel_encrypted(source, sink, conn_ctx),
+        (true, false) => shovel_encrypted(source, sink, conn_ctx),
+        (true, true) => shovel_decrypted(source, sink, conn_ctx),
     }
 }
 
-fn client_shovel_backend_to_client(
+fn shovel_decrypted(
     mut source: &TcpStream,
     mut sink: &TcpStream,
     conn_ctx: &mut ConnectionContext,
@@ -503,7 +503,7 @@ fn client_shovel_backend_to_client(
     }
 }
 
-fn server_shovel_backend_to_client(
+fn shovel_encrypted(
     mut source: &TcpStream,
     mut sink: &TcpStream,
     conn_ctx: &mut ConnectionContext,
@@ -540,101 +540,5 @@ fn server_shovel_backend_to_client(
 
         // clean buffer for if we write again
         buffer[..].fill(0);
-    }
-}
-
-fn client_shovel_client_to_backend(
-    mut source: &TcpStream,
-    mut sink: &TcpStream,
-    conn_ctx: &mut ConnectionContext,
-) -> Result<bool, std::io::Error> {
-    let mut buffer = [0u8; CIPHERTEXT_FRAME_BYTES];
-
-    loop {
-        debug!("before read");
-        let n = match source.read(&mut buffer[..(PLAINTEXT_BYTES - PLAINTEXT_OVERHEAD)]) {
-            Ok(n) => {
-                debug!("read {} bytes", n);
-                n
-            }
-            Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(false),
-            Err(e) => return Err(e),
-        };
-
-        // when read() returns 0 it means EOF / closed connection
-        if n == 0 {
-            return Ok(true);
-        }
-
-        assert!(n <= (PLAINTEXT_BYTES - PLAINTEXT_OVERHEAD));
-
-        let len: u32 = n.try_into().unwrap();
-        buffer[(PLAINTEXT_BYTES - PLAINTEXT_OVERHEAD)..PLAINTEXT_BYTES]
-            .copy_from_slice(&len.to_le_bytes());
-
-        let _ = crypto_secretbox_easy_inplace(&mut buffer, &conn_ctx.tx_nonce, &conn_ctx.tx_key);
-        conn_ctx.increment_tx_nonce();
-
-        sink.write_all(&buffer)?;
-        debug!("wrote {} bytes", buffer.len());
-
-        // clean buffer for if we write again
-        buffer[..].fill(0);
-    }
-}
-
-fn server_shovel_client_to_backend(
-    mut source: &TcpStream,
-    mut sink: &TcpStream,
-    conn_ctx: &mut ConnectionContext,
-) -> Result<bool, std::io::Error> {
-    loop {
-        debug!("before read");
-
-        assert!(conn_ctx.rx_buf_len < CIPHERTEXT_FRAME_BYTES);
-
-        let n = match source.read(&mut conn_ctx.rx_buf[conn_ctx.rx_buf_len..CIPHERTEXT_FRAME_BYTES])
-        {
-            Ok(n) => {
-                debug!("read {} bytes", n);
-                n
-            }
-            Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(false),
-            Err(e) => return Err(e),
-        };
-
-        // when read() returns 0 it means EOF / closed connection
-        if n == 0 {
-            return Ok(true);
-        }
-
-        conn_ctx.rx_buf_len += n;
-
-        // try to see if there's more to read, otherwise exit on WouldBlock
-        if conn_ctx.rx_buf_len < CIPHERTEXT_FRAME_BYTES {
-            continue;
-        }
-
-        assert!(conn_ctx.rx_buf_len == CIPHERTEXT_FRAME_BYTES);
-
-        let _ = crypto_secretbox_open_easy_inplace(
-            &mut conn_ctx.rx_buf,
-            &conn_ctx.rx_nonce,
-            &conn_ctx.rx_key,
-        );
-        conn_ctx.increment_rx_nonce();
-
-        let len = u32::from_le_bytes(
-            conn_ctx.rx_buf[(PLAINTEXT_BYTES - PLAINTEXT_OVERHEAD)..PLAINTEXT_BYTES]
-                .try_into()
-                .unwrap(),
-        );
-
-        let len: usize = len as usize;
-        sink.write_all(&conn_ctx.rx_buf[..len])?;
-        debug!("wrote {} bytes", len);
-
-        // clean buffer for if we write again
-        conn_ctx.reset_rx_buf();
     }
 }
