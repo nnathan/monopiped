@@ -9,6 +9,10 @@ use tracing::{debug, error, info, warn};
 
 use clap::{ArgGroup, Parser};
 
+use dryoc::classic::crypto_kx::*;
+use dryoc::classic::crypto_secretbox::{crypto_secretbox_easy, crypto_secretbox_open_easy};
+use dryoc::constants::CRYPTO_SECRETBOX_MACBYTES;
+
 use crate::utils::{crypto_hash_file, derive_keys};
 mod utils;
 
@@ -113,6 +117,8 @@ fn main() {
     }
 }
 
+const ENCRYPTED_HANDSHAKE_BYTES: usize = 32 + CRYPTO_SECRETBOX_MACBYTES;
+
 fn proxy_connection(
     client_stream: TcpStream,
     target: &str,
@@ -128,8 +134,11 @@ fn proxy_connection(
         return;
     }
 
-    // if client, connect to backend, complete handshake, and shovel
-    // if server, complete handshake, connect to backend, and shovel
+    // client/server:
+    //   - connect to backend
+    //   - initiate/complete handshake with backend/client
+    //   - proxy data
+
     let backend_stream = match TcpStream::connect(target) {
         Ok(backend_stream) => {
             info!("Connected to backend: {}", target);
@@ -146,6 +155,77 @@ fn proxy_connection(
             "Error setting backend connection to non-blocking (not proceeding): {:?}",
             e
         );
+        return;
+    }
+
+    let mut tx_key = [0u8; 32];
+    let mut rx_key = [0u8; 32];
+
+    tx_key[..].clone_from_slice(server_key);
+    rx_key[..].clone_from_slice(client_key);
+
+    if client {
+        tx_key[..].clone_from_slice(client_key);
+        rx_key[..].clone_from_slice(server_key);
+    }
+
+    let (pk, sk) = crypto_kx_keypair();
+    let nonce = [0u8; 24];
+
+    let mut encrypted_pk = [0u8; ENCRYPTED_HANDSHAKE_BYTES];
+
+    if crypto_secretbox_easy(&mut encrypted_pk, &pk, &nonce, &tx_key).is_err() {
+        error!("Error encrypting public key");
+        return;
+    }
+
+    let mut handshake_stream = &client_stream;
+
+    if client {
+        handshake_stream = &backend_stream;
+    }
+
+    if let Err(e) = handshake_stream.write_all(&encrypted_pk[..]) {
+        error!("Failed to send encrypted public key: {}", e);
+        return;
+    }
+
+    encrypted_pk = match receive_pubkey(handshake_stream) {
+        Ok((pk, eof)) => {
+            if eof {
+                error!("Connection closed during handshake");
+                return;
+            }
+
+            pk
+        }
+        Err(e) if e.kind() == ErrorKind::TimedOut => {
+            error!("Poll timeout waiting for handshake to complete (not proceeding)");
+            return;
+        }
+        Err(e) => {
+            error!("Error receiving encrypted public key: {:?}", e);
+            return;
+        }
+    };
+
+    let mut received_pk = [0u8; 32];
+
+    if crypto_secretbox_open_easy(&mut received_pk, &encrypted_pk, &nonce, &rx_key).is_err() {
+        error!("Failed to decrypted encrypted public key (not proceeding): authentication failure");
+        return;
+    }
+
+    if client {
+        if crypto_kx_client_session_keys(&mut rx_key, &mut tx_key, &pk, &sk, &received_pk).is_err()
+        {
+            error!("Failed to perform key exchange (not proceeding)");
+            return;
+        }
+    } else if crypto_kx_server_session_keys(&mut rx_key, &mut tx_key, &pk, &sk, &received_pk)
+        .is_err()
+    {
+        error!("Failed to perform key exchange (not proceeding)");
         return;
     }
 
@@ -229,6 +309,46 @@ fn proxy_connection(
                     return;
                 }
             }
+        }
+    }
+}
+
+fn receive_pubkey(
+    mut source: &TcpStream,
+) -> Result<([u8; ENCRYPTED_HANDSHAKE_BYTES], bool), std::io::Error> {
+    let mut encrypted_pk = [0u8; ENCRYPTED_HANDSHAKE_BYTES];
+    let mut received = 0;
+
+    let mut sources = popol::Sources::with_capacity(1);
+    let mut events = Vec::with_capacity(1);
+
+    sources.register((), source, popol::interest::READ);
+
+    loop {
+        events.clear();
+
+        sources.poll(&mut events, popol::Timeout::from_secs(60))?;
+
+        assert!(events.len() == 1, "expecting 1 event for handshake");
+
+        let n = match source.read(&mut encrypted_pk[received..]) {
+            Ok(n) => {
+                debug!("receive_pubkey read {} bytes", n);
+                n
+            }
+            Err(e) if e.kind() == ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        };
+
+        // when read() returns 0 it means EOF / closed connection
+        if n == 0 {
+            return Ok((encrypted_pk, true));
+        }
+
+        received += n;
+
+        if received == ENCRYPTED_HANDSHAKE_BYTES {
+            return Ok((encrypted_pk, false));
         }
     }
 }
