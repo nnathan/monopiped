@@ -3,6 +3,7 @@ use std::io::Read;
 
 use std::path::PathBuf;
 
+use dryoc::constants::CRYPTO_SECRETBOX_NONCEBYTES;
 use dryoc::classic::crypto_generichash::*;
 
 pub fn crypto_hash_file(pathname: &PathBuf) -> Result<[u8; 32], std::io::Error> {
@@ -24,7 +25,7 @@ pub fn crypto_hash_file(pathname: &PathBuf) -> Result<[u8; 32], std::io::Error> 
     }
 }
 
-pub fn increment_nonce(nonce: &mut [u8; 24], incr: u8) {
+pub fn increment_nonce(nonce: &mut [u8; CRYPTO_SECRETBOX_NONCEBYTES], incr: u8) {
     let mut acc: u16 = incr as u16;
 
     let mut i = 0;

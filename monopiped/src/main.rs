@@ -7,6 +7,7 @@ use tracing::{error, info, warn};
 
 use clap::{ArgGroup, Parser};
 
+use dryoc::constants::{CRYPTO_GENERICHASH_BYTES, CRYPTO_KDF_CONTEXTBYTES, CRYPTO_KDF_KEYBYTES};
 use dryoc::classic::crypto_kdf::*;
 
 use crate::conn::proxy_connection;
@@ -71,10 +72,10 @@ fn main() {
         }
     };
 
-    let derive_keys = |k: &[u8; 32]| {
-        let context: [u8; 8] = [0; 8];
-        let mut client_key: [u8; 32] = [0; 32];
-        let mut server_key: [u8; 32] = [0; 32];
+    let derive_keys = |k: &[u8; CRYPTO_GENERICHASH_BYTES]| {
+        let context  = [0u8; CRYPTO_KDF_CONTEXTBYTES];
+        let mut client_key = [0u8; CRYPTO_KDF_KEYBYTES];
+        let mut server_key = [0u8; CRYPTO_KDF_KEYBYTES];
         crypto_kdf_derive_from_key(&mut client_key, 0, &context, k).expect("client key kdf failed");
         crypto_kdf_derive_from_key(&mut server_key, 1, &context, k).expect("server key kdf failed");
         (client_key, server_key)
