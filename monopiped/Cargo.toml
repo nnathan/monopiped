@@ -11,3 +11,4 @@ dryoc = "0.5.0"
 popol = "3.0.0"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+mini-monocypher = { path = "./mini-monocypher" }

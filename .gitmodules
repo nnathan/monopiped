@@ -1,0 +1,3 @@
+[submodule "monopiped/mini-monocypher/monocypher-sys/Monocypher"]
+	path = monopiped/mini-monocypher/monocypher-sys/Monocypher
+	url = https://github.com/LoupVaillant/Monocypher/

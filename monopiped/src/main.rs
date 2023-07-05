@@ -7,11 +7,12 @@ use tracing::{error, info, warn};
 
 use clap::{ArgGroup, Parser};
 
-use dryoc::constants::{CRYPTO_GENERICHASH_BYTES, CRYPTO_KDF_CONTEXTBYTES, CRYPTO_KDF_KEYBYTES};
-use dryoc::classic::crypto_kdf::*;
+use dryoc::constants::{CRYPTO_GENERICHASH_BYTES, CRYPTO_KDF_KEYBYTES};
 
 use crate::conn::proxy_connection;
 use crate::utils::crypto_hash_file;
+
+use mini_monocypher::crypto_blake2b_keyed;
 
 mod conn;
 mod utils;
@@ -73,11 +74,10 @@ fn main() {
     };
 
     let derive_keys = |k: &[u8; CRYPTO_GENERICHASH_BYTES]| {
-        let context  = [0u8; CRYPTO_KDF_CONTEXTBYTES];
         let mut client_key = [0u8; CRYPTO_KDF_KEYBYTES];
         let mut server_key = [0u8; CRYPTO_KDF_KEYBYTES];
-        crypto_kdf_derive_from_key(&mut client_key, 0, &context, k).expect("client key kdf failed");
-        crypto_kdf_derive_from_key(&mut server_key, 1, &context, k).expect("server key kdf failed");
+        crypto_blake2b_keyed(&mut client_key, k, b"client");
+        crypto_blake2b_keyed(&mut server_key, k, b"server");
         (client_key, server_key)
     };
 
