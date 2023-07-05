@@ -23,3 +23,16 @@ pub fn crypto_hash_file(pathname: &PathBuf) -> Result<[u8; 32], std::io::Error> 
         crypto_generichash_update(&mut state, &buf[..n]);
     }
 }
+
+pub fn increment_nonce(nonce: &mut [u8; 24], incr: u8) {
+    let mut acc: u16 = incr as u16;
+
+    let mut i = 0;
+
+    while i < nonce.len() {
+        acc = (nonce[i] as u16) + acc;
+        nonce[i] = (acc & 0xFF) as u8;
+        acc = acc >> 8;
+        i += 1;
+    }
+}
