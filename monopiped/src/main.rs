@@ -371,6 +371,29 @@ fn receive_pubkey(
 
         assert!(events.len() == 1, "expecting 1 event for handshake");
 
+        let event = &events[0];
+
+        if event.is_invalid() {
+            // fd was probably not opened first
+            error!("received invalid event (aborting): {:?}", event);
+            return Ok((encrypted_pk, true));
+        }
+
+        if event.is_error() {
+            error!("received error in event (aborting): {:?}", event);
+            return Ok((encrypted_pk, true));
+        }
+
+        if event.is_hangup() {
+            error!("received hangup in event (aborting): {:?}", event);
+            return Ok((encrypted_pk, true));
+        }
+
+        if !event.is_readable() {
+            error!("received event but not readable: {:?}", event);
+            return Ok((encrypted_pk, true));
+        }
+
         let n = match source.read(&mut encrypted_pk[received..]) {
             Ok(n) => {
                 debug!("receive_pubkey read {} bytes", n);
