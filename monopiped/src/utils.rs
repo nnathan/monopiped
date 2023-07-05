@@ -37,3 +37,26 @@ pub fn increment_nonce(nonce: &mut [u8; CRYPTO_SECRETBOX_NONCEBYTES], incr: u8) 
         i += 1;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::increment_nonce;
+    use dryoc::constants::CRYPTO_SECRETBOX_NONCEBYTES;
+
+    #[test]
+    fn test_increment_nonce() {
+        let mut x = [0x0u8; CRYPTO_SECRETBOX_NONCEBYTES];
+        increment_nonce(&mut x, 2);
+        let mut expected = [0u8; CRYPTO_SECRETBOX_NONCEBYTES];
+        expected[0] = 2;
+        assert_eq!(x[..], expected[..]);
+    }
+
+    #[test]
+    fn test_increment_nonce_wrap() {
+        let mut x = [0xffu8; CRYPTO_SECRETBOX_NONCEBYTES];
+        increment_nonce(&mut x, 1);
+        let expected = [0u8; CRYPTO_SECRETBOX_NONCEBYTES];
+        assert_eq!(x[..], expected[..]);
+    }
+}
