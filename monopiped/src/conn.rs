@@ -389,8 +389,7 @@ fn shovel_decrypted(
                 .unwrap(),
         );
 
-        let len: usize = len as usize;
-        sink.write_all(&conn_ctx.rx_buf[..len])?;
+        sink.write_all(&conn_ctx.rx_buf[..len as usize])?;
         debug!("wrote {} bytes", len);
 
         // clean buffer for if we write again
