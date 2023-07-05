@@ -64,3 +64,75 @@ pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
         monocypher_sys::crypto_blake2b_final(ctx_ptr, hash_buf);
     }
 }
+
+pub fn crypto_aead_lock(
+    cipher_text: &mut [u8],
+    mac: &mut [u8],
+    key: &[u8],
+    nonce: &[u8],
+    ad: Option<&[u8]>,
+    plain_text: &[u8],
+) {
+    assert!(mac.len() == 16);
+    assert!(key.len() == 32);
+    assert!(nonce.len() == 24);
+
+    let cipher_text_buf = cipher_text.as_mut_ptr();
+    let mac_buf = mac.as_mut_ptr();
+    let key_buf = key.as_ptr();
+    let nonce_buf = nonce.as_ptr();
+    let (ad_buf, ad_len) = match ad {
+        None => (std::ptr::null(), 0),
+        Some(x) => (x.as_ptr(), x.len()),
+    };
+    let plain_text_buf = plain_text.as_ptr();
+
+    unsafe {
+        monocypher_sys::crypto_aead_lock(
+            cipher_text_buf,
+            mac_buf,
+            key_buf,
+            nonce_buf,
+            ad_buf,
+            ad_len,
+            plain_text_buf,
+            plain_text.len(),
+        );
+    }
+}
+
+pub fn crypto_aead_unlock(
+    plain_text: &mut [u8],
+    mac: &[u8],
+    key: &[u8],
+    nonce: &[u8],
+    ad: Option<&[u8]>,
+    cipher_text: &[u8],
+) {
+    assert!(mac.len() == 16);
+    assert!(key.len() == 32);
+    assert!(nonce.len() == 24);
+
+    let plain_text_buf = plain_text.as_mut_ptr();
+    let mac_buf = mac.as_ptr();
+    let key_buf = key.as_ptr();
+    let nonce_buf = nonce.as_ptr();
+    let (ad_buf, ad_len) = match ad {
+        None => (std::ptr::null(), 0),
+        Some(x) => (x.as_ptr(), x.len()),
+    };
+    let cipher_text_buf = cipher_text.as_ptr();
+
+    unsafe {
+        monocypher_sys::crypto_aead_unlock(
+            plain_text_buf,
+            mac_buf,
+            key_buf,
+            nonce_buf,
+            ad_buf,
+            ad.len(),
+            cipher_text_buf,
+            cipher_text.len(),
+        );
+    }
+}

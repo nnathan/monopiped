@@ -5,25 +5,22 @@ use std::os::unix::io::AsRawFd;
 use tracing::{debug, error, info};
 
 use dryoc::classic::crypto_kx::*;
-use dryoc::classic::crypto_secretbox::*;
-use dryoc::constants::{
-    CRYPTO_KX_PUBLICKEYBYTES, CRYPTO_SECRETBOX_KEYBYTES, CRYPTO_SECRETBOX_MACBYTES,
-    CRYPTO_SECRETBOX_NONCEBYTES,
-};
+use dryoc::constants::CRYPTO_KX_PUBLICKEYBYTES;
+use mini_monocypher::{crypto_aead_lock, crypto_aead_unlock};
 
 use crate::utils::increment_nonce;
 
-const ENCRYPTED_HANDSHAKE_BYTES: usize = CRYPTO_KX_PUBLICKEYBYTES + CRYPTO_SECRETBOX_MACBYTES;
+const ENCRYPTED_HANDSHAKE_BYTES: usize = 32 /* key */ + 16 /* tag */;
 
 const CIPHERTEXT_FRAME_BYTES: usize = 1060;
-const PLAINTEXT_FRAME_BYTES: usize = CIPHERTEXT_FRAME_BYTES - CRYPTO_SECRETBOX_MACBYTES;
+const PLAINTEXT_FRAME_BYTES: usize = CIPHERTEXT_FRAME_BYTES - 16 /* tag */;
 const PLAINTEXT_FRAME_LEN_BYTES: usize = 4;
 
 struct ConnectionContext {
-    tx_key: [u8; CRYPTO_SECRETBOX_KEYBYTES],
-    rx_key: [u8; CRYPTO_SECRETBOX_KEYBYTES],
-    tx_nonce: [u8; CRYPTO_SECRETBOX_NONCEBYTES],
-    rx_nonce: [u8; CRYPTO_SECRETBOX_NONCEBYTES],
+    tx_key: [u8; 32],
+    rx_key: [u8; 32],
+    tx_nonce: [u8; 24],
+    rx_nonce: [u8; 24],
     rx_buf: [u8; CIPHERTEXT_FRAME_BYTES],
     rx_buf_len: usize,
 }
@@ -47,8 +44,8 @@ pub fn proxy_connection(
     client_stream: TcpStream,
     target: &str,
     is_client: bool,
-    client_key: &[u8; CRYPTO_SECRETBOX_KEYBYTES],
-    server_key: &[u8; CRYPTO_SECRETBOX_KEYBYTES],
+    client_key: &[u8; 32],
+    server_key: &[u8; 32],
 ) {
     if let Err(e) = client_stream.set_nonblocking(true) {
         error!(
@@ -83,10 +80,10 @@ pub fn proxy_connection(
     }
 
     let mut conn_ctx = ConnectionContext {
-        tx_key: [0u8; CRYPTO_SECRETBOX_KEYBYTES],
-        rx_key: [0u8; CRYPTO_SECRETBOX_KEYBYTES],
-        rx_nonce: [0u8; CRYPTO_SECRETBOX_NONCEBYTES],
-        tx_nonce: [0u8; CRYPTO_SECRETBOX_NONCEBYTES],
+        tx_key: [0u8; 32],
+        rx_key: [0u8; 32],
+        rx_nonce: [0u8; 24],
+        tx_nonce: [0u8; 24],
         rx_buf: [0u8; CIPHERTEXT_FRAME_BYTES],
         rx_buf_len: 0,
     };
@@ -100,14 +97,20 @@ pub fn proxy_connection(
     }
 
     let (pk, sk) = crypto_kx_keypair();
-    let nonce = [0u8; CRYPTO_SECRETBOX_NONCEBYTES];
+    let nonce = [0u8; 24];
 
     let mut encrypted_pk = [0u8; ENCRYPTED_HANDSHAKE_BYTES];
 
-    if crypto_secretbox_easy(&mut encrypted_pk, &pk, &nonce, &conn_ctx.tx_key).is_err() {
-        error!("Error encrypting public key");
-        return;
-    }
+    let (encrypted_pk_detached, mac) = encrypted_pk.split_at_mut(ENCRYPTED_HANDSHAKE_BYTES - 16);
+
+    crypto_aead_lock(
+        encrypted_pk_detached,
+        mac,
+        &conn_ctx.tx_key,
+        &nonce,
+        None,
+        &pk,
+    );
 
     let mut handshake_stream = &client_stream;
 
@@ -141,12 +144,14 @@ pub fn proxy_connection(
 
     let mut received_pk = [0u8; CRYPTO_KX_PUBLICKEYBYTES];
 
-    if crypto_secretbox_open_easy(&mut received_pk, &encrypted_pk, &nonce, &conn_ctx.rx_key)
-        .is_err()
-    {
-        error!("Failed to decrypted encrypted public key (aborting): authentication failure");
-        return;
-    }
+    crypto_aead_unlock(
+        &mut received_pk,
+        &encrypted_pk[(ENCRYPTED_HANDSHAKE_BYTES - 16)..],
+        &conn_ctx.rx_key,
+        &nonce,
+        None,
+        &encrypted_pk[..(ENCRYPTED_HANDSHAKE_BYTES - 16)],
+    );
 
     if is_client {
         if crypto_kx_client_session_keys(
@@ -375,21 +380,26 @@ fn shovel_decrypted(
 
         assert!(conn_ctx.rx_buf_len == CIPHERTEXT_FRAME_BYTES);
 
-        let _ = crypto_secretbox_open_easy_inplace(
-            &mut conn_ctx.rx_buf,
-            &conn_ctx.rx_nonce,
+        let mut plaintext = [0u8; PLAINTEXT_FRAME_BYTES];
+
+        crypto_aead_unlock(
+            &mut plaintext,
+            &conn_ctx.rx_buf[PLAINTEXT_FRAME_BYTES..],
             &conn_ctx.rx_key,
+            &conn_ctx.rx_nonce,
+            None,
+            &conn_ctx.rx_buf[..PLAINTEXT_FRAME_BYTES],
         );
+
         conn_ctx.increment_rx_nonce();
 
         let len = u32::from_le_bytes(
-            conn_ctx.rx_buf
-                [(PLAINTEXT_FRAME_BYTES - PLAINTEXT_FRAME_LEN_BYTES)..PLAINTEXT_FRAME_BYTES]
+            plaintext[(PLAINTEXT_FRAME_BYTES - PLAINTEXT_FRAME_LEN_BYTES)..PLAINTEXT_FRAME_BYTES]
                 .try_into()
                 .unwrap(),
         );
 
-        sink.write_all(&conn_ctx.rx_buf[..len as usize])?;
+        sink.write_all(&plaintext[..len as usize])?;
         debug!("wrote {} bytes", len);
 
         // clean buffer for if we write again
@@ -402,7 +412,7 @@ fn shovel_encrypted(
     mut sink: &TcpStream,
     conn_ctx: &mut ConnectionContext,
 ) -> Result<bool, std::io::Error> {
-    let mut buffer = [0u8; CIPHERTEXT_FRAME_BYTES];
+    let mut buffer = [0u8; PLAINTEXT_FRAME_BYTES];
 
     loop {
         debug!("before read");
@@ -427,11 +437,22 @@ fn shovel_encrypted(
         buffer[(PLAINTEXT_FRAME_BYTES - PLAINTEXT_FRAME_LEN_BYTES)..PLAINTEXT_FRAME_BYTES]
             .copy_from_slice(&len.to_le_bytes());
 
-        let _ = crypto_secretbox_easy_inplace(&mut buffer, &conn_ctx.tx_nonce, &conn_ctx.tx_key);
+        let mut ciphertext = [0u8; CIPHERTEXT_FRAME_BYTES];
+        let (ciphertext_detached, mac) = ciphertext.split_at_mut(PLAINTEXT_FRAME_BYTES);
+
+        crypto_aead_lock(
+            ciphertext_detached,
+            mac,
+            &conn_ctx.tx_key,
+            &conn_ctx.tx_nonce,
+            None,
+            &buffer[..PLAINTEXT_FRAME_BYTES],
+        );
+
         conn_ctx.increment_tx_nonce();
 
-        sink.write_all(&buffer)?;
-        debug!("wrote {} bytes", buffer.len());
+        sink.write_all(&ciphertext)?;
+        debug!("wrote {} bytes", ciphertext.len());
 
         // clean buffer for if we write again
         buffer[..].fill(0);
