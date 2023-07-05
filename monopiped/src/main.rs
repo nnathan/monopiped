@@ -52,13 +52,13 @@ struct Args {
 
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 
-fn default_env() -> EnvFilter {
-    EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
-        .from_env_lossy()
-}
-
 fn main() {
+    let default_env = || {
+        EnvFilter::builder()
+            .with_default_directive(LevelFilter::INFO.into())
+            .from_env_lossy()
+    };
+
     tracing_subscriber::fmt()
         .compact()
         .with_target(false)
