@@ -275,16 +275,14 @@ fn proxy_connection(
 
         events.clear();
 
-        match sources.poll(&mut events, popol::Timeout::from_secs(1)) {
-            Ok(_) => {}
-            Err(e) if e.kind() == ErrorKind::TimedOut => {
+        if let Err(e) = sources.poll(&mut events, popol::Timeout::from_secs(1)) {
+            if e.kind() == ErrorKind::TimedOut {
                 debug!("poll timeout");
                 continue;
             }
-            Err(e) => {
-                error!("poll error: {:?}", e);
-                break;
-            }
+
+            error!("poll error: {:?}", e);
+            break;
         }
 
         debug!("draining {} events", events.len());
