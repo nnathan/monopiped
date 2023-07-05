@@ -30,9 +30,9 @@ pub fn increment_nonce(nonce: &mut [u8; 24], incr: u8) {
     let mut i = 0;
 
     while i < nonce.len() {
-        acc = (nonce[i] as u16) + acc;
+        acc += nonce[i] as u16;
         nonce[i] = (acc & 0xFF) as u8;
-        acc = acc >> 8;
+        acc >>= 8;
         i += 1;
     }
 }
