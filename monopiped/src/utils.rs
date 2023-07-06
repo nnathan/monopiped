@@ -3,7 +3,6 @@ use std::io::Read;
 
 use std::path::PathBuf;
 
-use dryoc::constants::CRYPTO_SECRETBOX_NONCEBYTES;
 use mini_monocypher::{
     crypto_blake2b_ctx_new, crypto_blake2b_final, crypto_blake2b_init, crypto_blake2b_update,
 };
@@ -29,7 +28,7 @@ pub fn crypto_hash_file(pathname: &PathBuf) -> Result<[u8; 32], std::io::Error> 
     }
 }
 
-pub fn increment_nonce(nonce: &mut [u8; CRYPTO_SECRETBOX_NONCEBYTES], incr: u8) {
+pub fn increment_nonce(nonce: &mut [u8; 24], incr: u8) {
     let mut acc: u16 = incr as u16;
 
     let mut i = 0;
@@ -45,22 +44,21 @@ pub fn increment_nonce(nonce: &mut [u8; CRYPTO_SECRETBOX_NONCEBYTES], incr: u8) 
 #[cfg(test)]
 mod tests {
     use super::increment_nonce;
-    use dryoc::constants::CRYPTO_SECRETBOX_NONCEBYTES;
 
     #[test]
     fn test_increment_nonce() {
-        let mut x = [0x0u8; CRYPTO_SECRETBOX_NONCEBYTES];
+        let mut x = [0u8; 24];
         increment_nonce(&mut x, 2);
-        let mut expected = [0u8; CRYPTO_SECRETBOX_NONCEBYTES];
+        let mut expected = [0u8; 24];
         expected[0] = 2;
         assert_eq!(x[..], expected[..]);
     }
 
     #[test]
     fn test_increment_nonce_wrap() {
-        let mut x = [0xffu8; CRYPTO_SECRETBOX_NONCEBYTES];
+        let mut x = [0xffu8; 24];
         increment_nonce(&mut x, 1);
-        let expected = [0u8; CRYPTO_SECRETBOX_NONCEBYTES];
+        let expected = [0u8; 24];
         assert_eq!(x[..], expected[..]);
     }
 }
