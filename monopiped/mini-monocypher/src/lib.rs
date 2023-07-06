@@ -2,6 +2,22 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+use std::error::Error;
+use std::fmt;
+
+#[derive(Debug)]
+pub enum ErrorKind {
+    AuthenticationFailure,
+}
+
+impl fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "authentication failure trying to decrypt ciphertext")
+    }
+}
+
+impl Error for ErrorKind {}
+
 pub fn crypto_blake2b(hash: &mut [u8], message: &[u8]) {
     assert!(hash.len() > 0 && hash.len() <= 64);
 
@@ -124,7 +140,7 @@ pub fn crypto_aead_unlock(
     nonce: &[u8],
     ad: Option<&[u8]>,
     cipher_text: &[u8],
-) {
+) -> Result<(), ErrorKind> {
     assert!(mac.len() == 16);
     assert!(key.len() == 32);
     assert!(nonce.len() == 24);
@@ -140,7 +156,7 @@ pub fn crypto_aead_unlock(
     let cipher_text_buf = cipher_text.as_ptr();
 
     unsafe {
-        monocypher_sys::crypto_aead_unlock(
+        let result = monocypher_sys::crypto_aead_unlock(
             plain_text_buf,
             mac_buf,
             key_buf,
@@ -150,7 +166,13 @@ pub fn crypto_aead_unlock(
             cipher_text_buf,
             cipher_text.len(),
         );
+
+        if result != 0 {
+            return Err(ErrorKind::AuthenticationFailure);
+        }
     }
+
+    Ok(())
 }
 
 pub fn crypto_x25519_public_key(
