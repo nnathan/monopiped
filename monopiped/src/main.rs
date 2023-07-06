@@ -7,6 +7,8 @@ use tracing::{error, info, warn};
 
 use clap::{ArgGroup, Parser};
 
+use zeroize::Zeroize;
+
 use crate::conn::proxy_connection;
 use crate::utils::crypto_hash_file;
 
@@ -62,7 +64,7 @@ fn main() {
 
     let args = Args::parse();
 
-    let master_key = match crypto_hash_file(&args.key) {
+    let mut master_key = match crypto_hash_file(&args.key) {
         Ok(k) => k,
         Err(e) => {
             let p = args.key.into_os_string().into_string().unwrap();
@@ -80,6 +82,7 @@ fn main() {
     };
 
     let (client_key, server_key) = derive_keys(&master_key);
+    master_key.zeroize();
 
     let listener_addr = args.listener.as_str();
 
