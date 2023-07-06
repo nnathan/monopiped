@@ -9,8 +9,8 @@ use rand_core::{OsRng, RngCore};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use mini_monocypher::{
-    crypto_aead_lock, crypto_aead_unlock, crypto_blake2b, crypto_blake2b_keyed, crypto_x25519,
-    crypto_x25519_public_key,
+    crypto_aead_lock, crypto_aead_lock_inplace, crypto_aead_unlock, crypto_aead_unlock_inplace,
+    crypto_blake2b, crypto_blake2b_keyed, crypto_x25519, crypto_x25519_public_key,
 };
 
 use crate::utils::increment_nonce;
@@ -398,33 +398,29 @@ fn shovel_decrypted(
 
         assert!(conn_ctx.rx_buf_len == CIPHERTEXT_FRAME_BYTES);
 
-        let mut plaintext = [0u8; PLAINTEXT_FRAME_BYTES];
-
-        if let Err(e) = crypto_aead_unlock(
-            &mut plaintext,
-            &conn_ctx.rx_buf[PLAINTEXT_FRAME_BYTES..],
+        if let Err(e) = crypto_aead_unlock_inplace(
+            &mut conn_ctx.rx_buf,
             &conn_ctx.rx_key,
             &conn_ctx.rx_nonce,
             None,
-            &conn_ctx.rx_buf[..PLAINTEXT_FRAME_BYTES],
         ) {
             error!("error decrypting ciphertext: {}", e);
-            plaintext.zeroize();
+            conn_ctx.rx_buf.zeroize();
             return Ok(true);
         }
 
         conn_ctx.increment_rx_nonce();
 
         let len = u32::from_le_bytes(
-            plaintext[(PLAINTEXT_FRAME_BYTES - PLAINTEXT_FRAME_LEN_BYTES)..PLAINTEXT_FRAME_BYTES]
+            conn_ctx.rx_buf[(PLAINTEXT_FRAME_BYTES - PLAINTEXT_FRAME_LEN_BYTES)..PLAINTEXT_FRAME_BYTES]
                 .try_into()
                 .unwrap(),
         );
 
-        sink.write_all(&plaintext[..len as usize])?;
+        sink.write_all(&conn_ctx.rx_buf[..len as usize])?;
         debug!("wrote {} bytes", len);
 
-        plaintext.zeroize();
+        conn_ctx.rx_buf.zeroize();
 
         // clean buffer for if we write again
         conn_ctx.reset_rx_buf();
@@ -436,7 +432,7 @@ fn shovel_encrypted(
     mut sink: &TcpStream,
     conn_ctx: &mut ConnectionContext,
 ) -> Result<bool, std::io::Error> {
-    let mut buffer = [0u8; PLAINTEXT_FRAME_BYTES];
+    let mut buffer = [0u8; CIPHERTEXT_FRAME_BYTES];
 
     loop {
         debug!("before read");
@@ -461,22 +457,19 @@ fn shovel_encrypted(
         buffer[(PLAINTEXT_FRAME_BYTES - PLAINTEXT_FRAME_LEN_BYTES)..PLAINTEXT_FRAME_BYTES]
             .copy_from_slice(&len.to_le_bytes());
 
-        let mut ciphertext = [0u8; CIPHERTEXT_FRAME_BYTES];
-        let (ciphertext_detached, mac) = ciphertext.split_at_mut(PLAINTEXT_FRAME_BYTES);
-
-        crypto_aead_lock(
-            ciphertext_detached,
-            mac,
+        debug!("plaintext before encrypt: {:02X?}", buffer);
+        crypto_aead_lock_inplace(
+            &mut buffer,
             &conn_ctx.tx_key,
             &conn_ctx.tx_nonce,
             None,
-            &buffer[..PLAINTEXT_FRAME_BYTES],
         );
+        debug!("ciphertext after encrypt: {:02X?}", buffer);
 
         conn_ctx.increment_tx_nonce();
 
-        sink.write_all(&ciphertext)?;
-        debug!("wrote {} bytes", ciphertext.len());
+        sink.write_all(&buffer)?;
+        debug!("wrote {} bytes", buffer.len());
 
         // clean buffer for if we write again
         buffer.zeroize();

@@ -133,6 +133,7 @@ pub fn crypto_aead_lock(
     }
 }
 
+
 pub fn crypto_aead_unlock(
     plain_text: &mut [u8],
     mac: &[u8],
@@ -214,3 +215,80 @@ pub fn crypto_x25519(
         )
     }
 }
+
+pub fn crypto_aead_lock_inplace(
+    in_out: &mut [u8],
+    key: &[u8],
+    nonce: &[u8],
+    ad: Option<&[u8]>,
+) {
+    assert!(in_out.len() >= 16);
+    assert!(key.len() == 32);
+    assert!(nonce.len() == 24);
+
+    let (buf, mac) = in_out.split_at_mut(in_out.len() - 16);
+    let plaintext_buf = buf.as_ptr();
+    let buf = buf.as_mut_ptr();
+    let mac_buf = mac.as_mut_ptr();
+    let key_buf = key.as_ptr();
+    let nonce_buf = nonce.as_ptr();
+    let (ad_buf, ad_len) = match ad {
+        None => (std::ptr::null(), 0),
+        Some(x) => (x.as_ptr(), x.len()),
+    };
+
+    unsafe {
+        monocypher_sys::crypto_aead_lock(
+            buf,
+            mac_buf,
+            key_buf,
+            nonce_buf,
+            ad_buf,
+            ad_len,
+            plaintext_buf,
+            in_out.len() - 16,
+        );
+    }
+}
+
+pub fn crypto_aead_unlock_inplace(
+    in_out: &mut [u8],
+    key: &[u8],
+    nonce: &[u8],
+    ad: Option<&[u8]>,
+) -> Result<(), ErrorKind> {
+    assert!(in_out.len() >= 16);
+    assert!(key.len() == 32);
+    assert!(nonce.len() == 24);
+
+    let (buf, mac) = in_out.split_at_mut(in_out.len() - 16);
+    let ciphertext_buf = buf.as_ptr();
+    let plaintext_buf = buf.as_mut_ptr();
+    let mac_buf = mac.as_ptr();
+    let key_buf = key.as_ptr();
+    let nonce_buf = nonce.as_ptr();
+    let (ad_buf, ad_len) = match ad {
+        None => (std::ptr::null(), 0),
+        Some(x) => (x.as_ptr(), x.len()),
+    };
+
+    unsafe {
+        let result = monocypher_sys::crypto_aead_unlock(
+            plaintext_buf,
+            mac_buf,
+            key_buf,
+            nonce_buf,
+            ad_buf,
+            ad_len,
+            ciphertext_buf,
+            in_out.len() - 16,
+        );
+
+        if result != 0 {
+            return Err(ErrorKind::AuthenticationFailure);
+        }
+    }
+
+    Ok(())
+}
+
