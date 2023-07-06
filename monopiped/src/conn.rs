@@ -167,14 +167,18 @@ pub fn proxy_connection(
 
     let mut received_pk = [0u8; 32];
 
-    crypto_aead_unlock(
+    if let Err(e) = crypto_aead_unlock(
         &mut received_pk,
         &encrypted_pk[(ENCRYPTED_HANDSHAKE_BYTES - 16)..],
         &conn_ctx.rx_key,
         &nonce,
         None,
         &encrypted_pk[..(ENCRYPTED_HANDSHAKE_BYTES - 16)],
-    );
+    ) {
+        error!("failed to decrypt encrypted public key: {}", e);
+        received_pk.zeroize();
+        return;
+    }
 
     let mut shared = [0u8; 32];
     crypto_x25519(&mut shared, &sk, &received_pk);
@@ -396,14 +400,18 @@ fn shovel_decrypted(
 
         let mut plaintext = [0u8; PLAINTEXT_FRAME_BYTES];
 
-        crypto_aead_unlock(
+        if let Err(e) = crypto_aead_unlock(
             &mut plaintext,
             &conn_ctx.rx_buf[PLAINTEXT_FRAME_BYTES..],
             &conn_ctx.rx_key,
             &conn_ctx.rx_nonce,
             None,
             &conn_ctx.rx_buf[..PLAINTEXT_FRAME_BYTES],
-        );
+        ) {
+            error!("error decrypting ciphertext: {}", e);
+            plaintext.zeroize();
+            return Ok(true);
+        }
 
         conn_ctx.increment_rx_nonce();
 
