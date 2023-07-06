@@ -2,6 +2,22 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+pub fn crypto_blake2b(hash: &mut [u8], message: &[u8]) {
+    assert!(hash.len() > 0 && hash.len() <= 64);
+
+    let hash_buf = hash.as_mut_ptr();
+    let message_buf = message.as_ptr();
+
+    unsafe {
+        monocypher_sys::crypto_blake2b(
+            hash_buf,
+            hash.len(),
+            message_buf,
+            message.len(),
+        );
+    }
+}
+
 pub fn crypto_blake2b_keyed(hash: &mut [u8], key: &[u8], message: &[u8]) {
     assert!(hash.len() > 0 && hash.len() <= 64);
     assert!(key.len() <= 64);
@@ -130,9 +146,49 @@ pub fn crypto_aead_unlock(
             key_buf,
             nonce_buf,
             ad_buf,
-            ad.len(),
+            ad_len,
             cipher_text_buf,
             cipher_text.len(),
         );
+    }
+}
+
+pub fn crypto_x25519_public_key(
+    public_key: &mut [u8],
+    secret_key: &[u8],
+) {
+    assert!(public_key.len() == 32);
+    assert!(secret_key.len() == 32);
+
+    let pub_buf = public_key.as_mut_ptr();
+    let secret_buf = secret_key.as_ptr();
+
+    unsafe {
+        monocypher_sys::crypto_x25519_public_key(
+            pub_buf,
+            secret_buf,
+        )
+    }
+}
+
+pub fn crypto_x25519(
+    raw_shared_secret: &mut [u8],
+    your_secret_key: &[u8],
+    their_public_key: &[u8],
+) {
+    assert!(raw_shared_secret.len() == 32);
+    assert!(your_secret_key.len() == 32);
+    assert!(their_public_key.len() == 32);
+
+    let raw_buf = raw_shared_secret.as_mut_ptr();
+    let secret_buf = your_secret_key.as_ptr();
+    let pub_buf = their_public_key.as_ptr();
+
+    unsafe {
+        monocypher_sys::crypto_x25519(
+            raw_buf,
+            secret_buf,
+            pub_buf,
+        )
     }
 }

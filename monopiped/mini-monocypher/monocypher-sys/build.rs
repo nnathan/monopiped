@@ -17,6 +17,7 @@ fn main() {
         // The input header we would like to generate
         // bindings for.
         .header("wrapper.h")
+        .allowlist_function("crypto_blake2b")
         .allowlist_function("crypto_blake2b_keyed")
         .allowlist_function("crypto_aead_.*lock")
         .allowlist_type("crypto_blake2b_ctx")

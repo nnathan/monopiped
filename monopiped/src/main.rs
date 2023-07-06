@@ -7,8 +7,6 @@ use tracing::{error, info, warn};
 
 use clap::{ArgGroup, Parser};
 
-use dryoc::constants::{CRYPTO_GENERICHASH_BYTES, CRYPTO_KDF_KEYBYTES};
-
 use crate::conn::proxy_connection;
 use crate::utils::crypto_hash_file;
 
@@ -73,9 +71,9 @@ fn main() {
         }
     };
 
-    let derive_keys = |k: &[u8; CRYPTO_GENERICHASH_BYTES]| {
-        let mut client_key = [0u8; CRYPTO_KDF_KEYBYTES];
-        let mut server_key = [0u8; CRYPTO_KDF_KEYBYTES];
+    let derive_keys = |k: &[u8; 32]| {
+        let mut client_key = [0u8; 32];
+        let mut server_key = [0u8; 32];
         crypto_blake2b_keyed(&mut client_key, k, b"client");
         crypto_blake2b_keyed(&mut server_key, k, b"server");
         (client_key, server_key)

@@ -4,9 +4,12 @@ use std::os::unix::io::AsRawFd;
 
 use tracing::{debug, error, info};
 
-use dryoc::classic::crypto_kx::*;
-use dryoc::constants::CRYPTO_KX_PUBLICKEYBYTES;
-use mini_monocypher::{crypto_aead_lock, crypto_aead_unlock};
+use rand_core::{OsRng, RngCore};
+
+use mini_monocypher::{
+    crypto_aead_lock, crypto_aead_unlock, crypto_blake2b, crypto_blake2b_keyed, crypto_x25519,
+    crypto_x25519_public_key,
+};
 
 use crate::utils::increment_nonce;
 
@@ -96,7 +99,16 @@ pub fn proxy_connection(
         conn_ctx.rx_key[..].clone_from_slice(server_key);
     }
 
-    let (pk, sk) = crypto_kx_keypair();
+    let derive_x25519_keypair = || {
+        let mut pk = [0u8; 32];
+        let mut sk = [0u8; 32];
+        OsRng.fill_bytes(&mut sk);
+        crypto_x25519_public_key(&mut pk, &sk);
+        (pk, sk)
+    };
+
+    let (pk, sk) = derive_x25519_keypair();
+
     let nonce = [0u8; 24];
 
     let mut encrypted_pk = [0u8; ENCRYPTED_HANDSHAKE_BYTES];
@@ -142,7 +154,7 @@ pub fn proxy_connection(
         }
     };
 
-    let mut received_pk = [0u8; CRYPTO_KX_PUBLICKEYBYTES];
+    let mut received_pk = [0u8; 32];
 
     crypto_aead_unlock(
         &mut received_pk,
@@ -153,30 +165,18 @@ pub fn proxy_connection(
         &encrypted_pk[..(ENCRYPTED_HANDSHAKE_BYTES - 16)],
     );
 
+    let mut shared = [0u8; 32];
+    crypto_x25519(&mut shared, &sk, &received_pk);
+
+    let mut shared_hash = [0u8; 32];
+    crypto_blake2b(&mut shared_hash, &shared);
+
     if is_client {
-        if crypto_kx_client_session_keys(
-            &mut conn_ctx.rx_key,
-            &mut conn_ctx.tx_key,
-            &pk,
-            &sk,
-            &received_pk,
-        )
-        .is_err()
-        {
-            error!("Failed to perform key exchange (aborting)");
-            return;
-        }
-    } else if crypto_kx_server_session_keys(
-        &mut conn_ctx.rx_key,
-        &mut conn_ctx.tx_key,
-        &pk,
-        &sk,
-        &received_pk,
-    )
-    .is_err()
-    {
-        error!("Failed to perform key exchange (aborting)");
-        return;
+        crypto_blake2b_keyed(&mut conn_ctx.rx_key, &shared_hash, b"server");
+        crypto_blake2b_keyed(&mut conn_ctx.tx_key, &shared_hash, b"client");
+    } else {
+        crypto_blake2b_keyed(&mut conn_ctx.rx_key, &shared_hash, b"client");
+        crypto_blake2b_keyed(&mut conn_ctx.tx_key, &shared_hash, b"server");
     }
 
     let mut sources = popol::Sources::with_capacity(2);
