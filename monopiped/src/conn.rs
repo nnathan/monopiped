@@ -6,6 +6,8 @@ use tracing::{debug, error, info};
 
 use rand_core::{OsRng, RngCore};
 
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
 use mini_monocypher::{
     crypto_aead_lock, crypto_aead_unlock, crypto_blake2b, crypto_blake2b_keyed, crypto_x25519,
     crypto_x25519_public_key,
@@ -42,6 +44,15 @@ impl ConnectionContext {
         self.rx_buf_len = 0;
     }
 }
+
+impl Zeroize for ConnectionContext {
+    fn zeroize(&mut self) {
+        self.tx_key.zeroize();
+        self.rx_key.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for ConnectionContext {}
 
 pub fn proxy_connection(
     client_stream: TcpStream,
@@ -107,7 +118,7 @@ pub fn proxy_connection(
         (pk, sk)
     };
 
-    let (pk, sk) = derive_x25519_keypair();
+    let (pk, mut sk) = derive_x25519_keypair();
 
     let nonce = [0u8; 24];
 
@@ -167,6 +178,7 @@ pub fn proxy_connection(
 
     let mut shared = [0u8; 32];
     crypto_x25519(&mut shared, &sk, &received_pk);
+    sk.zeroize();
 
     let mut shared_hash = [0u8; 32];
     crypto_blake2b(&mut shared_hash, &shared);
@@ -178,6 +190,8 @@ pub fn proxy_connection(
         crypto_blake2b_keyed(&mut conn_ctx.rx_key, &shared_hash, b"client");
         crypto_blake2b_keyed(&mut conn_ctx.tx_key, &shared_hash, b"server");
     }
+
+    shared_hash.zeroize();
 
     let mut sources = popol::Sources::with_capacity(2);
     let mut events = Vec::with_capacity(2);
@@ -402,6 +416,8 @@ fn shovel_decrypted(
         sink.write_all(&plaintext[..len as usize])?;
         debug!("wrote {} bytes", len);
 
+        plaintext.zeroize();
+
         // clean buffer for if we write again
         conn_ctx.reset_rx_buf();
     }
@@ -455,6 +471,6 @@ fn shovel_encrypted(
         debug!("wrote {} bytes", ciphertext.len());
 
         // clean buffer for if we write again
-        buffer[..].fill(0);
+        buffer.zeroize();
     }
 }
