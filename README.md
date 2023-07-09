@@ -13,3 +13,5 @@ The idea pivoted from being a modification of spiped to instead a reinterpretati
 ## Aspirations
 
 Currently the program implements a one thread per connection model. To minimise resources and improve scalability (as if it's needed) maybe the model will be switched to asynchronous network I/O using Tokio.
+
+It would also be nice to support proxying over WebSockets.
