@@ -1,11 +1,11 @@
-use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process;
-use std::thread;
 
 use tracing::{error, info, warn};
 
 use clap::{ArgGroup, Parser};
+
+use tokio::net::TcpListener;
 
 use zeroize::Zeroize;
 
@@ -48,7 +48,8 @@ struct Args {
 
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), tokio::io::Error> {
     let default_env = || {
         EnvFilter::builder()
             .with_default_directive(LevelFilter::INFO.into())
@@ -58,7 +59,7 @@ fn main() {
     tracing_subscriber::fmt()
         .compact()
         .with_target(false)
-        .with_thread_ids(true)
+        .with_thread_ids(false)
         .with_env_filter(default_env())
         .init();
 
@@ -86,7 +87,7 @@ fn main() {
 
     let listener_addr = args.listener.as_str();
 
-    let listener = match TcpListener::bind(listener_addr) {
+    let listener = match TcpListener::bind(listener_addr).await {
         Ok(listener) => listener,
         Err(e) => {
             error!("Failed to listen on {} {:?}", listener_addr, e);
@@ -96,33 +97,32 @@ fn main() {
 
     info!("Listening on {}", listener_addr);
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                match stream.peer_addr() {
-                    Ok(peer_addr) => {
-                        info!("New connection: {}", peer_addr);
-                    }
-                    Err(e) => {
-                        warn!("New connection: <error getting peer address>: {:?}", e);
-                    }
-                };
-
-                let target = args.target.clone();
-
-                thread::spawn(move || {
-                    proxy_connection(
-                        stream,
-                        target.as_str(),
-                        args.encrypt,
-                        &client_key,
-                        &server_key,
-                    );
-                });
+    loop {
+        let (stream, peer_addr) = match listener.accept().await {
+            Ok((stream, peer_addr)) => {
+                info!("New connection: {}", peer_addr);
+                (stream, peer_addr)
             }
+
             Err(e) => {
-                error!("Error accepting connection: {}", e);
+                warn!("New connection: <error getting peer address>: {:?}", e);
+                tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+                continue;
             }
-        }
+        };
+
+        let target = args.target.clone();
+
+        tokio::spawn(async move {
+            proxy_connection(
+                peer_addr,
+                stream,
+                target.as_str(),
+                args.encrypt,
+                &client_key,
+                &server_key,
+            )
+            .await;
+        });
     }
 }
