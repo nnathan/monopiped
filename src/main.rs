@@ -3,19 +3,22 @@ use std::process;
 
 use tracing::{error, info, warn};
 
-use clap::{ArgGroup, Parser};
+use clap::error::ErrorKind;
+use clap::{ArgGroup, CommandFactory, Parser};
 
 use tokio::net::TcpListener;
 
 use zeroize::Zeroize;
 
 use crate::conn::proxy_connection;
-use crate::utils::crypto_hash_file;
+use crate::utils::{crypto_hash_file, is_websocket_url};
+use crate::ws::proxy_ws_connection;
 
 use mini_monocypher::crypto_blake2b_keyed;
 
 mod conn;
 mod utils;
+mod ws;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -38,18 +41,37 @@ struct Args {
     listener: String,
 
     /// Target backend address
-    #[arg(short, long, value_name = "ADDR:PORT")]
+    #[arg(short, long, value_name = "WS_URL|ADDR:PORT")]
     target: String,
 
     /// Key material
     #[arg(short, long, value_name = "FILE")]
     key: PathBuf,
+
+    /// Configure listener to receive websocket connections (only in decrypt mode)
+    #[arg(short, long)]
+    ws: bool,
 }
 
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 
 #[tokio::main]
 async fn main() -> Result<(), tokio::io::Error> {
+    let mut args = Args::parse();
+
+    if is_websocket_url(&args.target) {
+        if args.decrypt {
+            let mut cmd = Args::command();
+            cmd.error(
+                ErrorKind::ArgumentConflict,
+                "Specifying target as a websocket URL is not supported in server (decrypt) mode",
+            )
+            .exit();
+        }
+
+        args.ws = true;
+    }
+
     let default_env = || {
         EnvFilter::builder()
             .with_default_directive(LevelFilter::INFO.into())
@@ -62,8 +84,6 @@ async fn main() -> Result<(), tokio::io::Error> {
         .with_thread_ids(false)
         .with_env_filter(default_env())
         .init();
-
-    let args = Args::parse();
 
     let mut master_key = match crypto_hash_file(&args.key) {
         Ok(k) => k,
@@ -112,6 +132,22 @@ async fn main() -> Result<(), tokio::io::Error> {
         };
 
         let target = args.target.clone();
+
+        if args.ws {
+            tokio::spawn(async move {
+                proxy_ws_connection(
+                    peer_addr,
+                    stream,
+                    target.as_str(),
+                    args.encrypt,
+                    &client_key,
+                    &server_key,
+                )
+                .await;
+            });
+
+            continue;
+        }
 
         tokio::spawn(async move {
             proxy_connection(

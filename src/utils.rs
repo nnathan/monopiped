@@ -3,9 +3,23 @@ use std::io::Read;
 
 use std::path::PathBuf;
 
+use rand_core::{OsRng, RngCore};
+
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
 use mini_monocypher::{
     crypto_blake2b_ctx_new, crypto_blake2b_final, crypto_blake2b_init, crypto_blake2b_update,
+    crypto_x25519_public_key,
 };
+
+pub fn is_websocket_url(url: &str) -> bool {
+    let url = url.to_lowercase();
+    if url.starts_with("ws:") || url.starts_with("wss:") {
+        return true;
+    }
+
+    false
+}
 
 pub fn crypto_hash_file(pathname: &PathBuf) -> Result<[u8; 32], std::io::Error> {
     const CHUNK_SIZE: usize = 4096;
@@ -40,6 +54,33 @@ pub fn increment_nonce(nonce: &mut [u8; 24], incr: u8) {
         i += 1;
     }
 }
+
+pub fn derive_x25519_keypair() -> ([u8; 32], [u8; 32]) {
+    let mut pk = [0u8; 32];
+    let mut sk = [0u8; 32];
+    OsRng.fill_bytes(&mut sk);
+    crypto_x25519_public_key(&mut pk, &sk);
+    (pk, sk)
+}
+
+pub struct Key {
+    pub key: [u8; 32],
+    pub nonce: [u8; 24],
+}
+
+impl Key {
+    pub fn increment_nonce(&mut self) {
+        increment_nonce(&mut self.nonce, 1);
+    }
+}
+
+impl Zeroize for Key {
+    fn zeroize(&mut self) {
+        self.key.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for Key {}
 
 #[cfg(test)]
 mod tests {

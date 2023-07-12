@@ -8,41 +8,19 @@ use tokio::net::TcpStream;
 use tracing::instrument;
 use tracing::{error, info};
 
-use rand_core::{OsRng, RngCore};
-
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::Zeroize;
 
 use mini_monocypher::{
     crypto_aead_lock, crypto_aead_unlock, crypto_blake2b, crypto_blake2b_keyed, crypto_x25519,
-    crypto_x25519_public_key,
 };
 
-use crate::utils::increment_nonce;
+use crate::utils::{derive_x25519_keypair, Key};
 
 const ENCRYPTED_HANDSHAKE_BYTES: usize = 32 /* key */ + 16 /* tag */;
 
 const CIPHERTEXT_FRAME_BYTES: usize = 1060;
 const PLAINTEXT_FRAME_BYTES: usize = CIPHERTEXT_FRAME_BYTES - 16 /* tag */;
 const PLAINTEXT_FRAME_LEN_BYTES: usize = 4;
-
-struct Key {
-    key: [u8; 32],
-    nonce: [u8; 24],
-}
-
-impl Key {
-    fn increment_nonce(&mut self) {
-        increment_nonce(&mut self.nonce, 1);
-    }
-}
-
-impl Zeroize for Key {
-    fn zeroize(&mut self) {
-        self.key.zeroize();
-    }
-}
-
-impl ZeroizeOnDrop for Key {}
 
 #[instrument(skip(client_stream, target, is_client, client_key, server_key))]
 pub async fn proxy_connection(
@@ -86,14 +64,6 @@ pub async fn proxy_connection(
         write_key.key[..].clone_from_slice(client_key);
         read_key.key[..].clone_from_slice(server_key);
     }
-
-    let derive_x25519_keypair = || {
-        let mut pk = [0u8; 32];
-        let mut sk = [0u8; 32];
-        OsRng.fill_bytes(&mut sk);
-        crypto_x25519_public_key(&mut pk, &sk);
-        (pk, sk)
-    };
 
     let (pk, mut sk) = derive_x25519_keypair();
 
