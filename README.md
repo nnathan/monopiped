@@ -12,7 +12,7 @@ The idea pivoted from being a modification of spiped to instead a reinterpretati
 
 ## Build
 
-Install Rust and run `cargo build -r`. (You want `-r` for release version which is many order of magnitudes faster than debug build.)
+Install Rust and run `cargo build -r`. (You want `-r` for release version which is at least an order of magnitude faster than debug build.)
 
 ## Operation
 
