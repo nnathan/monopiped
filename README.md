@@ -10,6 +10,10 @@ However since inception there was no progress on this front.
 
 The idea pivoted from being a modification of spiped to instead a reinterpretation in Rust, primarily as a technical exercise for the author to learn Rust and dabble in cryptography and sockets.
 
+## Build
+
+Install Rust and run `cargo build -r`. (You want `-r` for release version which is many order of magnitudes faster than debug build.)
+
 ## Operation
 
 There are two "modes" that monopiped can be run as:
