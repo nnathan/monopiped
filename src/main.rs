@@ -21,12 +21,47 @@ mod utils;
 mod ws;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about)]
 #[clap(group(
             ArgGroup::new("mode")
                 .required(true)
                 .args(&["encrypt", "decrypt"]),
         ))]
+
+/// monopiped tunnels and encrypts TCP connections over TCP or HTTP(S) WebSocket
+///
+/// Example Usage:
+///
+///    To tunnel SSH over TCP:
+///
+///      - generate key and copy to both client and server:
+///          dd if=/dev/urandom of=key.bin bs=32 count=1
+///
+///      - on the client run:
+///          monopiped -l 127.0.0.1:3000 -t server.example.com:2222 -e -k key.bin
+///
+///      - on the server run:
+///          monopiped -l 0.0.0.0:2222 -t 127.0.0.1:22 -d -k key.bin
+///
+///      - then finally on the client run:
+///          ssh -p3000 user@127.0.0.1
+///
+///    To tunnel SSH over WebSockets:
+///
+///      - generate key and copy to both client and server:
+///          dd if=/dev/urandom of=key.bin bs=32 count=1
+///
+///      - on the client run:
+///          monopiped -l 127.0.0.1:3000 -t wss://server.example.com/ssh -e -k key.bin
+///
+///      - on the server run:
+///          monopiped -l 127.0.0.1:3000 -t 127.0.0.1:22 -d -k key.bin -w
+///
+///      - on the server configure and run nginx/caddy/webserver proxy to proxy
+///        https://server.example.com/ssh to http://127.0.0.1:3000
+///
+///      - then finally on the client run:
+///          ssh -p3000 user@127.0.0.1
 struct Args {
     /// Take unencrypted connections from listener and send encryption connections to target
     #[arg(short, long)]
