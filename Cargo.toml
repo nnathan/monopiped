@@ -1,6 +1,14 @@
 [package]
 name = "monopiped"
 version = "0.1.0"
+authors = ["Naveen Nathan <naveen@lastninja.net>"]
+description = "monopiped tunnels and encrypts TCP applications over TCP/HTTP(S) WebSockets"
+documentation = "https://github.com/nnathan/monopiped"
+homepage = "https://github.com/nnathan/monopiped"
+repository = "https://github.com/nnathan/monopiped"
+keywords = ["tunnel", "proxy", "tcp", "websockets"]
+categories = ["command-line-utilities"]
+license = "CC0-1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
