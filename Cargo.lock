@@ -565,6 +565,7 @@ name = "mini-monocypher"
 version = "0.1.0"
 dependencies = [
  "mini-monocypher-sys",
+ "rand_core",
 ]
 
 [[package]]

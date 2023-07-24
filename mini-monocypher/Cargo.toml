@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 mini-monocypher-sys = { version = "0.1.0", path = "./mini-monocypher-sys" }
+
+[dev-dependencies]
+rand_core = { version = "0.6.4", features = ["getrandom"] }
