@@ -4,6 +4,10 @@ Monopiped is a pastiche of Colin Percival's [spiped](https://www.tarsnap.com/spi
 
 ## Motivation
 
+The idea of Monopiped started when working on [sobfs](https://github.com/nnathan/sobfs) which was in turn inspired by [this write up by George Murdocca](https://gist.github.com/gmurdocca/88857b58dc4668d88b0d0fae6ebf8b64) on how IDS middleboxes can be defeated using rot-13 encryption. These are all ideas for testing and improving the security of IDS middleboxes.
+
+After writing sobfs I learned about spiped which was a better solution than sobfs/rot-13 for defeating IDS middleboxes.
+
 Originally Monopiped was intended to modify spiped and replace crypto primitives by those available in [Monocypher](https://monocypher.org/) (e.g. X25519 instead of finite field Diffie-Hellman, ChaCha20Poly1305 instead of AES-CTR+HMAC, etc.).
 
 However since inception there was no progress on this front.
