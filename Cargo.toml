@@ -17,7 +17,7 @@ edition = "2021"
 clap = { version = "4.3.4", features = ["derive"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-mini-monocypher = { path = "./mini-monocypher" }
+mini-monocypher = { version = "0.1.0", path = "./mini-monocypher" }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 zeroize = "1.6.0"
 tokio = { version = "1", features = ["full"] }
