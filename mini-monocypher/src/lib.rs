@@ -25,7 +25,7 @@ pub fn crypto_blake2b(hash: &mut [u8], message: &[u8]) {
     let message_buf = message.as_ptr();
 
     unsafe {
-        monocypher_sys::crypto_blake2b(
+        mini_monocypher_sys::crypto_blake2b(
             hash_buf,
             hash.len(),
             message_buf,
@@ -43,7 +43,7 @@ pub fn crypto_blake2b_keyed(hash: &mut [u8], key: &[u8], message: &[u8]) {
     let message_buf = message.as_ptr();
 
     unsafe {
-        monocypher_sys::crypto_blake2b_keyed(
+        mini_monocypher_sys::crypto_blake2b_keyed(
             hash_buf,
             hash.len(),
             key_buf,
@@ -54,7 +54,7 @@ pub fn crypto_blake2b_keyed(hash: &mut [u8], key: &[u8], message: &[u8]) {
     }
 }
 
-type crypto_blake2b_ctx = monocypher_sys::crypto_blake2b_ctx;
+type crypto_blake2b_ctx = mini_monocypher_sys::crypto_blake2b_ctx;
 
 pub fn crypto_blake2b_ctx_new() -> crypto_blake2b_ctx {
     let ctx = crypto_blake2b_ctx {
@@ -74,7 +74,7 @@ pub fn crypto_blake2b_init(ctx: &mut crypto_blake2b_ctx, hash_size: usize) {
     let ctx_ptr = ctx as *mut crypto_blake2b_ctx;
 
     unsafe {
-        monocypher_sys::crypto_blake2b_init(ctx_ptr, hash_size);
+        mini_monocypher_sys::crypto_blake2b_init(ctx_ptr, hash_size);
     }
 }
 
@@ -83,7 +83,7 @@ pub fn crypto_blake2b_update(ctx: &mut crypto_blake2b_ctx, message: &[u8]) {
     let message_buf = message.as_ptr();
 
     unsafe {
-        monocypher_sys::crypto_blake2b_update(ctx_ptr, message_buf, message.len());
+        mini_monocypher_sys::crypto_blake2b_update(ctx_ptr, message_buf, message.len());
     }
 }
 
@@ -93,7 +93,7 @@ pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
     let hash_buf = hash.as_mut_ptr();
 
     unsafe {
-        monocypher_sys::crypto_blake2b_final(ctx_ptr, hash_buf);
+        mini_monocypher_sys::crypto_blake2b_final(ctx_ptr, hash_buf);
     }
 }
 
@@ -120,7 +120,7 @@ pub fn crypto_aead_lock(
     let plain_text_buf = plain_text.as_ptr();
 
     unsafe {
-        monocypher_sys::crypto_aead_lock(
+        mini_monocypher_sys::crypto_aead_lock(
             cipher_text_buf,
             mac_buf,
             key_buf,
@@ -156,7 +156,7 @@ pub fn crypto_aead_unlock(
     let cipher_text_buf = cipher_text.as_ptr();
 
     unsafe {
-        let result = monocypher_sys::crypto_aead_unlock(
+        let result = mini_monocypher_sys::crypto_aead_unlock(
             plain_text_buf,
             mac_buf,
             key_buf,
@@ -186,7 +186,7 @@ pub fn crypto_x25519_public_key(
     let secret_buf = secret_key.as_ptr();
 
     unsafe {
-        monocypher_sys::crypto_x25519_public_key(
+        mini_monocypher_sys::crypto_x25519_public_key(
             pub_buf,
             secret_buf,
         )
@@ -207,7 +207,7 @@ pub fn crypto_x25519(
     let pub_buf = their_public_key.as_ptr();
 
     unsafe {
-        monocypher_sys::crypto_x25519(
+        mini_monocypher_sys::crypto_x25519(
             raw_buf,
             secret_buf,
             pub_buf,

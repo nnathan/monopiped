@@ -564,7 +564,15 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 name = "mini-monocypher"
 version = "0.1.0"
 dependencies = [
- "monocypher-sys",
+ "mini-monocypher-sys",
+]
+
+[[package]]
+name = "mini-monocypher-sys"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
 ]
 
 [[package]]
@@ -591,14 +599,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys",
-]
-
-[[package]]
-name = "monocypher-sys"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "cc",
 ]
 
 [[package]]
