@@ -12,7 +12,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 use std::error::Error;
 use std::fmt;
