@@ -24,5 +24,5 @@ mini-monocypher = { version = "0.1.0", path = "./mini-monocypher" }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 zeroize = "1.6.0"
 tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = { version = "*", features = ["native-tls"] }
+tokio-tungstenite = { version = "0", features = ["native-tls"] }
 futures-util = { version = "0.3.28", default-features = false, features = ["sink", "std"] }
