@@ -1,29 +1,9 @@
 use std::env;
 use std::path::PathBuf;
-use std::process::Command;
-use std::io::Write;
 
 use bindgen::CargoCallbacks;
 
 fn main() {
-    // Fetch Monocypher git submodule
-    let output = Command::new("git")
-            .args([
-                "submodule",
-                "update",
-                "--init",
-                "--depth=1",
-        ])
-        .output()
-        .expect("Failed execute git!");
-
-    std::io::stderr().write_all(&output.stdout).unwrap();
-    std::io::stderr().write_all(&output.stderr).unwrap();
-
-    if !output.status.success() {
-        panic!("git submodule update failed! exit code: {}", output.status);
-    }
-
     // Compile monocypher from the source in the submodule.
     cc::Build::new()
         .file("Monocypher/src/monocypher.c")
