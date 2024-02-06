@@ -90,8 +90,10 @@ server.example.com:80 server.example.com:443 {
 
 The above Caddyfile listens on both HTTP and HTTPS. Since the transport is end-to-end encrypted between client and server over WebSockets or TCP, it is perfectly fine to use HTTP and still maintain confidentiality and integrity. Packet captures of traffic over HTTP would just show WebSocket binary payloads and little else.
 
-## Aspirations
+## Acknowledgements
 
-~Currently the program implements a one thread per connection model. To minimise resources and improve scalability (as if it's needed) maybe the model will be switched to asynchronous network I/O using Tokio.~
+Thanks to [George Murdocca](https://github.com/gmurdocca) for inspiring this idea (see above for link to his writeup).
 
-~It would also be nice to support proxying over WebSockets.~
+Thanks to [Gak](https://github.com/gak) for patiently helping me understand Rust and providing direction on how to implement Monopiped.
+
+Thanks to [Colin Percival](https://github.com/cperciva) for providing a reference to work from including specifying a design document to understand how the cryptography was implemented.
