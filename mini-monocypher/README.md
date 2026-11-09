@@ -17,3 +17,9 @@ The current API supported:
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions
+
+## Known limitations
+
+Monocypher allows the input and output of encryption and decryption to be the
+same buffer. Rust does not allow a buffer to be borrowed both mutably and
+immutably, so these bindings require separate buffers.

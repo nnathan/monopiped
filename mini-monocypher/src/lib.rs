@@ -274,6 +274,10 @@ pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
 ///
 /// `cipher_text.len()` must be >= `plain_text.len()`.
 ///
+/// Unlike Monocypher, `cipher_text` and `plain_text` cannot be the same buffer
+/// for in-place encryption, as Rust does not allow a buffer to be borrowed
+/// both mutably and immutably. Separate buffers must be used.
+///
 /// It is recommended to read the AEAD section of the [`Monocypher` manual]
 /// for the full intricacies on using the `crypto_aead_{lock,unlock}` interface.
 ///
@@ -371,6 +375,10 @@ pub fn crypto_aead_lock(
 /// `plain_text`.
 ///
 /// `plain_text.len()` must be >= `cipher_text.len()`.
+///
+/// Unlike Monocypher, `plain_text` and `cipher_text` cannot be the same buffer
+/// for in-place decryption, as Rust does not allow a buffer to be borrowed
+/// both mutably and immutably. Separate buffers must be used.
 ///
 /// See [`crypto_aead_lock`] for a full round trip example of performing
 /// a lock (encrypt) and unlock (decrypt).
