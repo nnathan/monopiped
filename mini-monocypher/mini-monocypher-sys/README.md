@@ -16,6 +16,7 @@ The current bindings are generated:
   - `crypto_elligator_*` functions
   - `crypto_argon2`
   - `crypto_sha512*` functions, including HMAC and HKDF
+  - `crypto_ed25519_*` functions
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions

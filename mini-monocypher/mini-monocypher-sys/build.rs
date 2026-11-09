@@ -41,6 +41,7 @@ fn main() {
         .allowlist_function("crypto_sha512(_init|_update|_final)?")
         .allowlist_function("crypto_sha512_hmac(_init|_update|_final)?")
         .allowlist_function("crypto_sha512_hkdf(_expand)?")
+        .allowlist_function("crypto_ed25519_(key_pair|sign|check|ph_sign|ph_check)")
         .allowlist_type("crypto_sha512_ctx")
         .allowlist_type("crypto_sha512_hmac_ctx")
         .allowlist_var("CRYPTO_ARGON2_(D|I|ID)")

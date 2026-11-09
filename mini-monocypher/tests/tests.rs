@@ -1087,3 +1087,110 @@ test_ctx_wiped_on_drop!(
         mini_monocypher::crypto_sha512_hmac_init(&mut ctx, &[1u8; 32]);
     }
 );
+
+mod ed25519 {
+    use hex_literal::hex;
+    use mini_monocypher::{
+        crypto_ed25519_check, crypto_ed25519_key_pair, crypto_ed25519_ph_check,
+        crypto_ed25519_ph_sign, crypto_ed25519_sign, crypto_sha512, ErrorKind,
+    };
+
+    fn key_pair(mut seed: [u8; 32]) -> ([u8; 64], [u8; 32]) {
+        let mut secret_key = [0u8; 64];
+        let mut public_key = [0u8; 32];
+
+        crypto_ed25519_key_pair(&mut secret_key, &mut public_key, &mut seed);
+
+        (secret_key, public_key)
+    }
+
+    // RFC 8032 section 7.1 test 1
+    #[test]
+    fn rfc_8032_ed25519() {
+        let (secret_key, public_key) = key_pair(hex!(
+            "9d 61 b1 9d ef fd 5a 60 ba 84 4a f4 92 ec 2c c4 44 49 c5 69 7b 32 69 19 70 3b ac 03 1c ae 7f 60"
+        ));
+        let expected = hex!(
+            "e5 56 43 00 c3 60 ac 72 90 86 e2 cc 80 6e 82 8a 84 87 7f 1e b8 e5 d9 74 d8 73 e0 65 22 49 01 55"
+            "5f b8 82 15 90 a3 3b ac c6 1e 39 70 1c f9 b4 6b d2 5b f5 f0 59 5b be 24 65 51 41 43 8e 7a 10 0b"
+        );
+        let mut signature = [0u8; 64];
+
+        assert_eq!(public_key, hex!("d7 5a 98 01 82 b1 0a b7 d5 4b fe d3 c9 64 07 3a 0e e1 72 f3 da a6 23 25 af 02 1a 68 f7 07 51 1a"));
+
+        crypto_ed25519_sign(&mut signature, &secret_key, b"");
+
+        assert_eq!(signature, expected, "incorrect signature");
+        assert!(crypto_ed25519_check(&signature, &public_key, b"").is_ok());
+    }
+
+    // RFC 8032 section 7.3 test abc
+    #[test]
+    fn rfc_8032_ed25519ph() {
+        let (secret_key, public_key) = key_pair(hex!(
+            "83 3f e6 24 09 23 7b 9d 62 ec 77 58 75 20 91 1e 9a 75 9c ec 1d 19 75 5b 7d a9 01 b9 6d ca 3d 42"
+        ));
+        let expected = hex!(
+            "98 a7 02 22 f0 b8 12 1a a9 d3 0f 81 3d 68 3f 80 9e 46 2b 46 9c 7f f8 76 39 49 9b b9 4e 6d ae 41"
+            "31 f8 50 42 46 3c 2a 35 5a 20 03 d0 62 ad f5 aa a1 0b 8c 61 e6 36 06 2a aa d1 1c 2a 26 08 34 06"
+        );
+        let mut message_hash = [0u8; 64];
+        let mut signature = [0u8; 64];
+
+        assert_eq!(public_key, hex!("ec 17 2b 93 ad 5e 56 3b f4 93 2c 70 e1 24 50 34 c3 54 67 ef 2e fd 4d 64 eb f8 19 68 34 67 e2 bf"));
+
+        crypto_sha512(&mut message_hash, b"abc");
+        crypto_ed25519_ph_sign(&mut signature, &secret_key, &message_hash);
+
+        assert_eq!(signature, expected, "incorrect signature");
+        assert!(crypto_ed25519_ph_check(&signature, &public_key, &message_hash).is_ok());
+    }
+
+    #[test]
+    fn key_pair_wipes_seed() {
+        let original = [5u8; 32];
+        let mut seed = original;
+        let mut secret_key = [0u8; 64];
+        let mut public_key = [0u8; 32];
+
+        crypto_ed25519_key_pair(&mut secret_key, &mut public_key, &mut seed);
+
+        assert_eq!(seed, [0u8; 32], "seed was not wiped");
+        assert_eq!(secret_key[..32], original);
+        assert_eq!(secret_key[32..], public_key);
+    }
+
+    #[test]
+    fn rejects_tampering() {
+        let (secret_key, public_key) = key_pair([5u8; 32]);
+        let (_, other_public_key) = key_pair([6u8; 32]);
+        let mut signature = [0u8; 64];
+
+        crypto_ed25519_sign(&mut signature, &secret_key, b"Lorem ipsum");
+
+        let result = crypto_ed25519_check(&signature, &public_key, b"Lorem ipsuM");
+        assert!(matches!(result, Err(ErrorKind::InvalidSignature)));
+        assert!(crypto_ed25519_check(&signature, &other_public_key, b"Lorem ipsum").is_err());
+
+        for i in [0, 31, 32, 63] {
+            let mut bad_signature = signature;
+            bad_signature[i] ^= 1;
+            assert!(crypto_ed25519_check(&bad_signature, &public_key, b"Lorem ipsum").is_err(), "byte {i}");
+        }
+    }
+
+    #[test]
+    fn ph_rejects_tampering() {
+        let (secret_key, public_key) = key_pair([5u8; 32]);
+        let message_hash = [9u8; 64];
+        let mut wrong_hash = message_hash;
+        wrong_hash[0] ^= 1;
+        let mut signature = [0u8; 64];
+
+        crypto_ed25519_ph_sign(&mut signature, &secret_key, &message_hash);
+
+        assert!(crypto_ed25519_ph_check(&signature, &public_key, &message_hash).is_ok());
+        let result = crypto_ed25519_ph_check(&signature, &public_key, &wrong_hash);
+        assert!(matches!(result, Err(ErrorKind::InvalidSignature)));
+    }
+}
