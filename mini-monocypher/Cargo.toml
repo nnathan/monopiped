@@ -2,7 +2,7 @@
 name = "mini-monocypher"
 version = "0.3.0"
 authors = ["Naveen Nathan <naveen@lastninja.net>"]
-description = "Monocypher C-like API"
+description = "C-like Monocypher API with Rust safety where it makes sense"
 documentation = "https://github.com/nnathan/monopiped/tree/main/mini-monocypher"
 homepage = "https://github.com/nnathan/monopiped/tree/main/mini-monocypher"
 repository = "https://github.com/nnathan/monopiped/tree/main/mini-monocypher"

@@ -1,6 +1,8 @@
 //! # mini-monocypher
 //!
-//! A C-like Rust API for [`Monocypher`]
+//! A C-like Rust API for [`Monocypher`], with Rust safety where it makes sense.
+//!
+//! This release has full coverage of the API for [Monocypher 4.0.3].
 //!
 //! This documentation covers the usage of Monocypher through these bindings,
 //! but for the intricacies regarding cryptographic usage and security hygiene
@@ -8,6 +10,7 @@
 //!
 //! [`Monocypher`]: https://monocypher.org/
 //! [`Monocypher` manual]: https://monocypher.org/manual/
+//! [Monocypher 4.0.3]: https://github.com/LoupVaillant/Monocypher/releases/tag/4.0.3
 
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
