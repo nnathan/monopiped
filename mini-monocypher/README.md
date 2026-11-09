@@ -17,6 +17,7 @@ The current API supported:
   - `crypto_x25519`
   - `crypto_x25519_public_key`
   - `crypto_x25519_{to_eddsa,inverse,dirty_small,dirty_fast}`
+  - `crypto_eddsa_*` functions
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions
@@ -24,6 +25,7 @@ The current API supported:
 
 ## Known limitations
 
-Monocypher allows the input and output of encryption and decryption to be the
-same buffer. Rust does not allow a buffer to be borrowed both mutably and
-immutably, so these bindings require separate buffers.
+Monocypher allows the input and output of some functions, such as encryption
+and decryption, to be the same or overlapping buffers. Rust does not allow a
+buffer to be borrowed both mutably and immutably, so these bindings require
+separate buffers.

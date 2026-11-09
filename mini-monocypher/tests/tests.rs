@@ -617,3 +617,76 @@ fn test_crypto_x25519_dirty_matches_public_key_with_low_bits_cleared() {
         assert_eq!(dirty, clean, "key {i}");
     }
 }
+
+fn eddsa_test_key_pair(i: u8) -> ([u8; 64], [u8; 32]) {
+    let mut seed = x25519_test_key(i);
+    let mut secret_key = [0u8; 64];
+    let mut public_key = [0u8; 32];
+
+    mini_monocypher::crypto_eddsa_key_pair(&mut secret_key, &mut public_key, &mut seed);
+
+    (secret_key, public_key)
+}
+
+#[test]
+fn test_crypto_eddsa_key_pair_wipes_seed() {
+    let original = x25519_test_key(1);
+    let mut seed = original;
+    let mut secret_key = [0u8; 64];
+    let mut public_key = [0u8; 32];
+
+    mini_monocypher::crypto_eddsa_key_pair(&mut secret_key, &mut public_key, &mut seed);
+
+    assert_eq!(seed, [0u8; 32], "seed was not wiped");
+    assert_eq!(secret_key[..32], original, "secret key should start with the seed");
+    assert_eq!(secret_key[32..], public_key, "secret key should end with the public key");
+}
+
+#[test]
+fn test_crypto_eddsa_sign_and_check() {
+    let (secret_key, public_key) = eddsa_test_key_pair(1);
+    let (_, other_public_key) = eddsa_test_key_pair(2);
+    let mut signature = [0u8; 64];
+
+    mini_monocypher::crypto_eddsa_sign(&mut signature, &secret_key, b"Lorem ipsum");
+
+    assert!(mini_monocypher::crypto_eddsa_check(&signature, &public_key, b"Lorem ipsum").is_ok());
+
+    let result = mini_monocypher::crypto_eddsa_check(&signature, &public_key, b"Lorem ipsuM");
+    assert!(matches!(result, Err(mini_monocypher::ErrorKind::InvalidSignature)));
+
+    assert!(mini_monocypher::crypto_eddsa_check(&signature, &other_public_key, b"Lorem ipsum").is_err());
+
+    for i in [0, 31, 32, 63] {
+        let mut bad_signature = signature;
+        bad_signature[i] ^= 1;
+        assert!(
+            mini_monocypher::crypto_eddsa_check(&bad_signature, &public_key, b"Lorem ipsum").is_err(),
+            "byte {i}"
+        );
+    }
+}
+
+#[test]
+fn test_x25519_eddsa_conversions() {
+    for i in 0..32 {
+        let (secret_key, mut eddsa_public) = eddsa_test_key_pair(i);
+        let mut x25519_private = [0u8; 64];
+        let mut converted = [0u8; 32];
+        let mut x25519_public = [0u8; 32];
+        let mut converted_back = [0u8; 32];
+
+        mini_monocypher::crypto_blake2b(&mut x25519_private, &secret_key[..32]);
+        mini_monocypher::crypto_eddsa_to_x25519(&mut converted, &eddsa_public);
+        mini_monocypher::crypto_x25519_public_key(
+            &mut x25519_public,
+            x25519_private[..32].try_into().unwrap(),
+        );
+        assert_eq!(converted, x25519_public, "key {i}");
+
+        mini_monocypher::crypto_x25519_to_eddsa(&mut converted_back, &converted);
+        assert_eq!(converted_back[31] & 0x80, 0, "key {i}");
+        eddsa_public[31] &= 0x7f;
+        assert_eq!(converted_back, eddsa_public, "key {i}");
+    }
+}
