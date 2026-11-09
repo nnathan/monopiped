@@ -16,6 +16,7 @@ The current API supported:
   - `crypto_aead_{init_x,init_djb,init_ietf,write,read}`
   - `crypto_x25519`
   - `crypto_x25519_public_key`
+  - `crypto_x25519_{to_eddsa,inverse,dirty_small,dirty_fast}`
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions

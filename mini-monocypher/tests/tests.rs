@@ -548,3 +548,72 @@ mod aead_incremental {
         let _ = crypto_aead_read(&mut ctx(), &mut [0u8; 4], &[0u8; 16], None, b"Lorem");
     }
 }
+
+fn x25519_test_key(i: u8) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    mini_monocypher::crypto_blake2b(&mut key, &[i]);
+    key
+}
+
+#[test]
+fn test_crypto_x25519_inverse_undoes_crypto_x25519() {
+    for i in 0..32 {
+        let private_key = x25519_test_key(i);
+        let mut base = [0u8; 32];
+        let mut curve_point = [0u8; 32];
+        let mut blind_salt = [0u8; 32];
+
+        mini_monocypher::crypto_x25519_public_key(&mut base, &x25519_test_key(100 + i));
+        mini_monocypher::crypto_x25519(&mut curve_point, &private_key, &base);
+        mini_monocypher::crypto_x25519_inverse(&mut blind_salt, &private_key, &curve_point);
+
+        assert_eq!(blind_salt, base, "key {i}");
+    }
+}
+
+#[test]
+fn test_crypto_x25519_inverse_low_order_points_give_zero() {
+    let low_order = [
+        [0u8; 32],
+        hex!("01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"),
+        hex!("5f 9c 95 bc a3 50 8c 24 b1 d0 b1 55 9c 83 ef 5b 04 44 5c c4 58 1c 8e 86 d8 22 4e dd d0 9f 11 57"),
+        hex!("e0 eb 7a 7c 3b 41 b8 ae 16 56 e3 fa f1 9f c4 6a da 09 8d eb 9c 32 b1 fd 86 62 05 16 5f 49 b8 00"),
+    ];
+
+    for point in low_order {
+        let mut blind_salt = [0xffu8; 32];
+
+        mini_monocypher::crypto_x25519_inverse(&mut blind_salt, &x25519_test_key(1), &point);
+
+        assert_eq!(blind_salt, [0u8; 32]);
+    }
+}
+
+#[test]
+fn test_crypto_x25519_dirty_functions_agree() {
+    for i in 0..32 {
+        let sk = x25519_test_key(i);
+        let mut small = [0u8; 32];
+        let mut fast = [0u8; 32];
+
+        mini_monocypher::crypto_x25519_dirty_small(&mut small, &sk);
+        mini_monocypher::crypto_x25519_dirty_fast(&mut fast, &sk);
+
+        assert_eq!(small, fast, "key {i}");
+    }
+}
+
+#[test]
+fn test_crypto_x25519_dirty_matches_public_key_with_low_bits_cleared() {
+    for i in 0..32 {
+        let mut sk = x25519_test_key(i);
+        sk[0] &= 248;
+        let mut dirty = [0u8; 32];
+        let mut clean = [0u8; 32];
+
+        mini_monocypher::crypto_x25519_dirty_fast(&mut dirty, &sk);
+        mini_monocypher::crypto_x25519_public_key(&mut clean, &sk);
+
+        assert_eq!(dirty, clean, "key {i}");
+    }
+}

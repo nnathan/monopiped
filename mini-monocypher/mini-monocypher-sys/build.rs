@@ -35,6 +35,7 @@ fn main() {
         .allowlist_type("crypto_aead_ctx")
         .allowlist_function("crypto_x25519_public_key")
         .allowlist_function("crypto_x25519")
+        .allowlist_function("crypto_x25519_(to_eddsa|inverse|dirty_small|dirty_fast)")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(CargoCallbacks))
