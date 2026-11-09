@@ -47,6 +47,9 @@ impl Error for ErrorKind {}
 /// between 1 and 64. Anything below 32 is discouraged when using
 /// BLAKE2b as a general purpose hash function.
 ///
+/// It is recommended to read the [`Monocypher` manual] before using this
+/// function.
+///
 /// # Examples
 ///
 /// ```
@@ -60,6 +63,8 @@ impl Error for ErrorKind {}
 /// # Panics
 ///
 /// This function can panic if `hash.len()` is not between 1 and 64.
+///
+/// [`Monocypher` manual]: https://monocypher.org/manual/blake2b
 pub fn crypto_blake2b(hash: &mut [u8], message: &[u8]) {
     assert!(hash.len() > 0 && hash.len() <= 64);
 
@@ -349,7 +354,7 @@ pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
 ///
 /// This function panics if `cipher_text.len() < plain_text.len()`.
 ///
-/// [`Monocypher` manual]: (https://monocypher.org/manual/aead)
+/// [`Monocypher` manual]: https://monocypher.org/manual/aead
 pub fn crypto_aead_lock(
     cipher_text: &mut [u8],
     mac: &mut [u8; 16],
@@ -407,7 +412,7 @@ pub fn crypto_aead_lock(
 ///
 /// This function panics if `plain_text.len() < cipher_text.len()`.
 ///
-/// [`Monocypher` manual]: (https://monocypher.org/manual/aead)
+/// [`Monocypher` manual]: https://monocypher.org/manual/aead
 pub fn crypto_aead_unlock(
     plain_text: &mut [u8],
     mac: &[u8; 16],
@@ -471,6 +476,9 @@ pub fn crypto_x25519_public_key(public_key: &mut [u8; 32], secret_key: &[u8; 32]
 
 /// Perform an X25519 key exchange between `your_secret_key` and `their_public_key`.
 ///
+/// It is recommended to read the [`Monocypher` manual] before using this
+/// function.
+///
 /// # Examples
 ///
 /// ```
@@ -494,6 +502,8 @@ pub fn crypto_x25519_public_key(public_key: &mut [u8; 32], secret_key: &[u8; 32]
 /// // or crypto_blake2b_keyed with key=shared_secret to derive
 /// // multiple keys
 /// ```
+///
+/// [`Monocypher` manual]: https://monocypher.org/manual/x25519
 pub fn crypto_x25519(
     raw_shared_secret: &mut [u8; 32],
     your_secret_key: &[u8; 32],
