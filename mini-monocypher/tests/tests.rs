@@ -416,3 +416,135 @@ test_ctx_wiped_on_drop!(
         mini_monocypher::crypto_poly1305_init(&mut ctx, &[1u8; 32]);
     }
 );
+
+test_ctx_wiped_on_drop!(
+    test_crypto_aead_ctx_wiped_on_drop,
+    crypto_aead_ctx,
+    crypto_aead_ctx_new,
+    |ctx| {
+        mini_monocypher::crypto_aead_init_x(&mut ctx, &[1u8; 32], &[2u8; 24]);
+    }
+);
+
+mod aead_incremental {
+    use mini_monocypher::{
+        crypto_aead_ctx, crypto_aead_ctx_new, crypto_aead_init_djb, crypto_aead_init_ietf,
+        crypto_aead_init_x, crypto_aead_lock, crypto_aead_read, crypto_aead_write, ErrorKind,
+    };
+
+    const KEY: [u8; 32] = [1u8; 32];
+    const NONCE: [u8; 24] = [2u8; 24];
+    const AD: &[u8] = b"authentication data";
+
+    fn ctx() -> crypto_aead_ctx {
+        let mut ctx = crypto_aead_ctx_new();
+        crypto_aead_init_x(&mut ctx, &KEY, &NONCE);
+        ctx
+    }
+
+    fn two_chunks() -> ([[u8; 5]; 2], [[u8; 16]; 2]) {
+        let mut cipher_text = [[0u8; 5]; 2];
+        let mut mac = [[0u8; 16]; 2];
+        let mut w = ctx();
+
+        crypto_aead_write(&mut w, &mut cipher_text[0], &mut mac[0], Some(AD), b"Lorem");
+        crypto_aead_write(&mut w, &mut cipher_text[1], &mut mac[1], Some(AD), b"ipsum");
+
+        (cipher_text, mac)
+    }
+
+    macro_rules! round_trip {
+        ($name:ident, $init:ident, $nonce_size:expr) => {
+            #[test]
+            fn $name() {
+                let nonce = [3u8; $nonce_size];
+                let (mut w, mut r) = (crypto_aead_ctx_new(), crypto_aead_ctx_new());
+                $init(&mut w, &KEY, &nonce);
+                $init(&mut r, &KEY, &nonce);
+
+                for chunk in [&b"Lorem"[..], b"ipsum dolor", b""] {
+                    let mut cipher_text = vec![0u8; chunk.len()];
+                    let mut plain_text = vec![0u8; chunk.len()];
+                    let mut mac = [0u8; 16];
+
+                    crypto_aead_write(&mut w, &mut cipher_text, &mut mac, Some(AD), chunk);
+                    crypto_aead_read(&mut r, &mut plain_text, &mac, Some(AD), &cipher_text)
+                        .expect("decryption should succeed");
+
+                    assert_eq!(plain_text, chunk);
+                }
+            }
+        };
+    }
+
+    round_trip!(round_trip_x, crypto_aead_init_x, 24);
+    round_trip!(round_trip_djb, crypto_aead_init_djb, 8);
+    round_trip!(round_trip_ietf, crypto_aead_init_ietf, 12);
+
+    #[test]
+    fn first_write_matches_crypto_aead_lock() {
+        let (mut a, mut b) = ([0u8; 5], [0u8; 5]);
+        let (mut a_mac, mut b_mac) = ([0u8; 16], [0u8; 16]);
+
+        crypto_aead_write(&mut ctx(), &mut a, &mut a_mac, Some(AD), b"Lorem");
+        crypto_aead_lock(&mut b, &mut b_mac, &KEY, &NONCE, Some(AD), b"Lorem");
+
+        assert_eq!(a, b);
+        assert_eq!(a_mac, b_mac);
+    }
+
+    #[test]
+    fn rejects_reordered_chunks() {
+        let (cipher_text, mac) = two_chunks();
+        let mut plain_text = [0u8; 5];
+
+        let result = crypto_aead_read(&mut ctx(), &mut plain_text, &mac[1], Some(AD), &cipher_text[1]);
+
+        assert!(matches!(result, Err(ErrorKind::AuthenticationFailure)));
+    }
+
+    #[test]
+    fn failed_read_writes_nothing_and_leaves_ctx_usable() {
+        let (cipher_text, mac) = two_chunks();
+        let mut bad_mac = mac[0];
+        bad_mac[0] ^= 1;
+        let mut plain_text = [0xffu8; 5];
+        let mut r = ctx();
+
+        assert!(crypto_aead_read(&mut r, &mut plain_text, &bad_mac, Some(AD), &cipher_text[0]).is_err());
+        assert_eq!(plain_text, [0xffu8; 5]);
+
+        assert!(crypto_aead_read(&mut r, &mut plain_text, &mac[0], Some(b"wrong"), &cipher_text[0]).is_err());
+
+        crypto_aead_read(&mut r, &mut plain_text, &mac[0], Some(AD), &cipher_text[0])
+            .expect("correct chunk should still succeed");
+        assert_eq!(&plain_text, b"Lorem");
+    }
+
+    #[test]
+    fn longer_output_leaves_the_rest_untouched() {
+        let mut cipher_text = [0xffu8; 8];
+        let mut plain_text = [0xffu8; 8];
+        let mut mac = [0u8; 16];
+
+        crypto_aead_write(&mut ctx(), &mut cipher_text, &mut mac, None, b"Lorem");
+        assert_eq!(cipher_text[5..], [0xffu8; 3]);
+
+        crypto_aead_read(&mut ctx(), &mut plain_text, &mac, None, &cipher_text[..5])
+            .expect("decryption should succeed");
+        assert_eq!(&plain_text[..5], b"Lorem");
+        assert_eq!(plain_text[5..], [0xffu8; 3]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn write_rejects_short_cipher_text() {
+        crypto_aead_write(&mut ctx(), &mut [0u8; 4], &mut [0u8; 16], None, b"Lorem");
+    }
+
+    #[test]
+    #[should_panic]
+    fn read_rejects_short_plain_text() {
+        let _ = crypto_aead_read(&mut ctx(), &mut [0u8; 4], &[0u8; 16], None, b"Lorem");
+    }
+}

@@ -8,6 +8,7 @@ The current bindings are generated:
 
   - `crypto_blake2b_*` functions
   - `crypto_aead_{lock,unlock}`
+  - `crypto_aead_{init_x,init_djb,init_ietf,write,read}`
   - `crypto_x25519`
   - `crypto_x25519_public_key`
   - `crypto_verify{16,32,64}`

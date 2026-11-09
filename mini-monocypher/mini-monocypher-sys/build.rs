@@ -31,6 +31,8 @@ fn main() {
         .allowlist_function("crypto_poly1305(_init|_update|_final)?")
         .allowlist_type("crypto_poly1305_ctx")
         .allowlist_function("crypto_chacha20_(h|djb|ietf|x)")
+        .allowlist_function("crypto_aead_(init_x|init_djb|init_ietf|write|read)")
+        .allowlist_type("crypto_aead_ctx")
         .allowlist_function("crypto_x25519_public_key")
         .allowlist_function("crypto_x25519")
         // Tell cargo to invalidate the built crate whenever any of the
