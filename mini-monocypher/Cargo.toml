@@ -1,6 +1,6 @@
 [package]
 name = "mini-monocypher"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Naveen Nathan <naveen@lastninja.net>"]
 description = "Monocypher C-like API"
 documentation = "https://github.com/nnathan/monopiped/tree/main/mini-monocypher"
@@ -14,7 +14,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mini-monocypher-sys = { version = "0.1.1", path = "./mini-monocypher-sys" }
+mini-monocypher-sys = { version = "0.1.2", path = "./mini-monocypher-sys" }
 
 [dev-dependencies]
 rand_core = { version = "0.6.4", features = ["getrandom"] }
