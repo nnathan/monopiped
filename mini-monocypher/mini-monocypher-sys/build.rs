@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use bindgen::CargoCallbacks;
 
 fn main() {
+    // bindgen only tracks headers, so a change to the C source needs declaring.
+    println!("cargo:rerun-if-changed=Monocypher/src/monocypher.c");
+
     // Compile monocypher from the source in the submodule.
     cc::Build::new()
         .file("Monocypher/src/monocypher.c")
