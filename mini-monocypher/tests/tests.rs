@@ -108,7 +108,7 @@ fn test_crypto_aead_unlock() {
       &nonce,
       Some(ad),
       &ciphertext,
-    );
+    ).expect("decryption should succeed");
 
     assert_eq!(&plaintext, expected_plaintext, "incorrect plaintext");
 }
