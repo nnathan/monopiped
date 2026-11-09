@@ -32,8 +32,9 @@ pub fn crypto_hash_file(pathname: &PathBuf) -> Result<[u8; 32], std::io::Error> 
 
     loop {
         let n = f.read(&mut buf)?;
-        if n < CHUNK_SIZE {
-            crypto_blake2b_update(&mut ctx, &buf[..n]);
+
+        // a short read is not EOF, only read() returning 0 is
+        if n == 0 {
             crypto_blake2b_final(&mut ctx, &mut output);
             return Ok(output);
         }

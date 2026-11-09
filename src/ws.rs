@@ -165,6 +165,7 @@ pub async fn proxy_ws_connection(
 
     let mut shared_hash = [0u8; 32];
     crypto_blake2b(&mut shared_hash, &shared);
+    shared.zeroize();
 
     if is_client {
         crypto_blake2b_keyed(&mut read_key.key, &shared_hash, b"server");
