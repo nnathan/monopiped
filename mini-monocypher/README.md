@@ -20,6 +20,7 @@ The current API supported:
   - `crypto_eddsa_*` functions (the low-level building blocks are in the `hazmat` module)
   - `crypto_elligator_*` functions
   - `crypto_argon2`
+  - `crypto_sha512*` functions, including HMAC and HKDF
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions

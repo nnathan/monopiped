@@ -6,10 +6,12 @@ use bindgen::CargoCallbacks;
 fn main() {
     // bindgen only tracks headers, so a change to the C source needs declaring.
     println!("cargo:rerun-if-changed=Monocypher/src/monocypher.c");
+    println!("cargo:rerun-if-changed=Monocypher/src/optional/monocypher-ed25519.c");
 
     // Compile monocypher from the source in the submodule.
     cc::Build::new()
         .file("Monocypher/src/monocypher.c")
+        .file("Monocypher/src/optional/monocypher-ed25519.c")
         .include("Monocypher/src")
         .compile("monocypher");
 
@@ -20,6 +22,7 @@ fn main() {
         // The input header we would like to generate
         // bindings for.
         .header("wrapper.h")
+        .clang_arg("-IMonocypher/src")
         .allowlist_function("crypto_blake2b")
         .allowlist_function("crypto_blake2b_keyed")
         .allowlist_function("crypto_aead_.*lock")
@@ -35,6 +38,11 @@ fn main() {
         .allowlist_type("crypto_aead_ctx")
         .allowlist_function("crypto_elligator_(map|rev|key_pair)")
         .allowlist_function("crypto_argon2")
+        .allowlist_function("crypto_sha512(_init|_update|_final)?")
+        .allowlist_function("crypto_sha512_hmac(_init|_update|_final)?")
+        .allowlist_function("crypto_sha512_hkdf(_expand)?")
+        .allowlist_type("crypto_sha512_ctx")
+        .allowlist_type("crypto_sha512_hmac_ctx")
         .allowlist_var("CRYPTO_ARGON2_(D|I|ID)")
         .allowlist_function("crypto_eddsa_(key_pair|sign|check|to_x25519)")
         .allowlist_function("crypto_eddsa_(trim_scalar|reduce|mul_add|scalarbase|check_equation)")

@@ -929,3 +929,161 @@ mod argon2 {
     rejects!(rejects_small_work_area, 7, inputs(), nb_blocks: 8);
     rejects!(rejects_short_salt, 8, crypto_argon2_inputs { pass: &PASS, salt: &[0u8; 7] }, nb_blocks: 8);
 }
+
+mod sha512 {
+    use hex_literal::hex;
+    use mini_monocypher::{
+        crypto_sha512, crypto_sha512_ctx_new, crypto_sha512_final, crypto_sha512_hkdf,
+        crypto_sha512_hkdf_expand, crypto_sha512_hmac, crypto_sha512_hmac_ctx_new,
+        crypto_sha512_hmac_final, crypto_sha512_hmac_init, crypto_sha512_hmac_update,
+        crypto_sha512_init, crypto_sha512_update,
+    };
+
+    const SPLITS: [usize; 6] = [0, 1, 127, 128, 129, 300];
+
+    fn long_message() -> Vec<u8> {
+        (0..300).map(|i| i as u8).collect()
+    }
+
+    // FIPS 180 "abc"
+    #[test]
+    fn known_hash() {
+        let mut hash = [0u8; 64];
+        let expected = hex!(
+            "dd af 35 a1 93 61 7a ba cc 41 73 49 ae 20 41 31 12 e6 fa 4e 89 a9 7e a2 0a 9e ee e6 4b 55 d3 9a"
+            "21 92 99 2a 27 4f c1 a8 36 ba 3c 23 a3 fe eb bd 45 4d 44 23 64 3c e8 0e 2a 9a c9 4f a5 4c a4 9f"
+        );
+
+        crypto_sha512(&mut hash, b"abc");
+
+        assert_eq!(hash, expected, "incorrect hash");
+    }
+
+    #[test]
+    fn incremental_matches_one_shot() {
+        let message = long_message();
+        let mut expected = [0u8; 64];
+        crypto_sha512(&mut expected, &message);
+
+        for split in SPLITS {
+            let mut hash = [0u8; 64];
+            let mut ctx = crypto_sha512_ctx_new();
+
+            crypto_sha512_init(&mut ctx);
+            crypto_sha512_update(&mut ctx, &message[..split]);
+            crypto_sha512_update(&mut ctx, &message[split..]);
+            crypto_sha512_final(&mut ctx, &mut hash);
+
+            assert_eq!(hash, expected, "split {split}");
+        }
+    }
+
+    // RFC 4231 test case 1
+    #[test]
+    fn known_hmac() {
+        let mut hmac = [0u8; 64];
+        let expected = hex!(
+            "87 aa 7c de a5 ef 61 9d 4f f0 b4 24 1a 1d 6c b0 23 79 f4 e2 ce 4e c2 78 7a d0 b3 05 45 e1 7c de"
+            "da a8 33 b7 d6 b8 a7 02 03 8b 27 4e ae a3 f4 e4 be 9d 91 4e eb 61 f1 70 2e 69 6c 20 3a 12 68 54"
+        );
+
+        crypto_sha512_hmac(&mut hmac, &[0x0bu8; 20], b"Hi There");
+
+        assert_eq!(hmac, expected, "incorrect hmac");
+    }
+
+    #[test]
+    fn hmac_incremental_matches_one_shot() {
+        let message = long_message();
+        let key = [7u8; 32];
+        let mut expected = [0u8; 64];
+        crypto_sha512_hmac(&mut expected, &key, &message);
+
+        for split in SPLITS {
+            let mut hmac = [0u8; 64];
+            let mut ctx = crypto_sha512_hmac_ctx_new();
+
+            crypto_sha512_hmac_init(&mut ctx, &key);
+            crypto_sha512_hmac_update(&mut ctx, &message[..split]);
+            crypto_sha512_hmac_update(&mut ctx, &message[split..]);
+            crypto_sha512_hmac_final(&mut ctx, &mut hmac);
+
+            assert_eq!(hmac, expected, "split {split}");
+        }
+    }
+
+    #[test]
+    fn hkdf_is_extract_then_expand() {
+        let (ikm, salt, info) = (b"input key", [2u8; 16], b"domain");
+        let mut prk = [0u8; 64];
+        let mut expanded = [0u8; 100];
+        let mut okm = [0u8; 100];
+
+        crypto_sha512_hmac(&mut prk, &salt, ikm);
+        crypto_sha512_hkdf_expand(&mut expanded, &prk, Some(info));
+        crypto_sha512_hkdf(&mut okm, ikm, Some(&salt), Some(info));
+
+        assert_eq!(okm, expanded);
+    }
+
+    #[test]
+    fn hkdf_expand_first_block_is_hmac_of_info_and_counter() {
+        let prk = [3u8; 64];
+        let mut okm = [0u8; 64];
+        let mut expected = [0u8; 64];
+
+        crypto_sha512_hkdf_expand(&mut okm, &prk, Some(b"domain"));
+        crypto_sha512_hmac(&mut expected, &prk, b"domain\x01");
+
+        assert_eq!(okm, expected);
+    }
+
+    #[test]
+    fn hkdf_none_is_the_same_as_empty() {
+        let mut a = [0u8; 32];
+        let mut b = [0u8; 32];
+
+        crypto_sha512_hkdf(&mut a, b"ikm", None, None);
+        crypto_sha512_hkdf(&mut b, b"ikm", Some(&[]), Some(&[]));
+
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn hkdf_accepts_the_maximum_length() {
+        let mut okm = vec![0u8; 16320];
+
+        crypto_sha512_hkdf(&mut okm, b"ikm", None, None);
+        crypto_sha512_hkdf_expand(&mut okm, &[1u8; 64], None);
+    }
+
+    #[test]
+    #[should_panic]
+    fn hkdf_rejects_too_much_output() {
+        crypto_sha512_hkdf(&mut vec![0u8; 16321], b"ikm", None, None);
+    }
+
+    #[test]
+    #[should_panic]
+    fn hkdf_expand_rejects_too_much_output() {
+        crypto_sha512_hkdf_expand(&mut vec![0u8; 16321], &[1u8; 64], None);
+    }
+}
+
+test_ctx_wiped_on_drop!(
+    test_crypto_sha512_ctx_wiped_on_drop,
+    crypto_sha512_ctx,
+    crypto_sha512_ctx_new,
+    |ctx| {
+        mini_monocypher::crypto_sha512_init(&mut ctx);
+    }
+);
+
+test_ctx_wiped_on_drop!(
+    test_crypto_sha512_hmac_ctx_wiped_on_drop,
+    crypto_sha512_hmac_ctx,
+    crypto_sha512_hmac_ctx_new,
+    |ctx| {
+        mini_monocypher::crypto_sha512_hmac_init(&mut ctx, &[1u8; 32]);
+    }
+);
