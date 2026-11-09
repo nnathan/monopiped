@@ -249,7 +249,7 @@ pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
 ///
 /// crypto_aead_lock(
 ///     ciphertext_detached,
-///     mac,
+///     mac.try_into().unwrap(),
 ///     &key,
 ///     &nonce,
 ///     Some(ad),
@@ -262,7 +262,7 @@ pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
 ///
 /// crypto_aead_unlock(
 ///     &mut plaintext,
-///     &aead_ciphertext[(aead_ciphertext.len() - 16)..],
+///     aead_ciphertext[(aead_ciphertext.len() - 16)..].try_into().unwrap(),
 ///     &key,
 ///     &nonce,
 ///     Some(ad),
@@ -272,21 +272,17 @@ pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
 ///
 /// # Panics
 ///
-/// This function panics if `mac.len() != 16` or `key.len() != 32`
-/// or `nonce.len() != 24` or if `cipher_text.len() < plain_text.len()`.
+/// This function panics if `cipher_text.len() < plain_text.len()`.
 ///
 /// [`Monocypher` manual]: (https://monocypher.org/manual/aead)
 pub fn crypto_aead_lock(
     cipher_text: &mut [u8],
-    mac: &mut [u8],
-    key: &[u8],
-    nonce: &[u8],
+    mac: &mut [u8; 16],
+    key: &[u8; 32],
+    nonce: &[u8; 24],
     ad: Option<&[u8]>,
     plain_text: &[u8],
 ) {
-    assert!(mac.len() == 16);
-    assert!(key.len() == 32);
-    assert!(nonce.len() == 24);
     assert!(cipher_text.len() >= plain_text.len());
 
     let cipher_text_buf = cipher_text.as_mut_ptr();
@@ -330,21 +326,17 @@ pub fn crypto_aead_lock(
 ///
 /// # Panics
 ///
-/// This function panics if `mac.len() != 16` or `key.len() != 32`
-/// or `nonce.len() != 24` or if `plain_text.len() < cipher_text.len()`.
+/// This function panics if `plain_text.len() < cipher_text.len()`.
 ///
 /// [`Monocypher` manual]: (https://monocypher.org/manual/aead)
 pub fn crypto_aead_unlock(
     plain_text: &mut [u8],
-    mac: &[u8],
-    key: &[u8],
-    nonce: &[u8],
+    mac: &[u8; 16],
+    key: &[u8; 32],
+    nonce: &[u8; 24],
     ad: Option<&[u8]>,
     cipher_text: &[u8],
 ) -> Result<(), ErrorKind> {
-    assert!(mac.len() == 16);
-    assert!(key.len() == 32);
-    assert!(nonce.len() == 24);
     assert!(plain_text.len() >= cipher_text.len());
 
     let plain_text_buf = plain_text.as_mut_ptr();
@@ -391,10 +383,7 @@ pub fn crypto_aead_unlock(
 /// OsRng.fill_bytes(&mut secret_key);
 /// crypto_x25519_public_key(&mut public_key, &secret_key);
 /// ```
-pub fn crypto_x25519_public_key(public_key: &mut [u8], secret_key: &[u8]) {
-    assert!(public_key.len() == 32);
-    assert!(secret_key.len() == 32);
-
+pub fn crypto_x25519_public_key(public_key: &mut [u8; 32], secret_key: &[u8; 32]) {
     let pub_buf = public_key.as_mut_ptr();
     let secret_buf = secret_key.as_ptr();
 
@@ -427,14 +416,10 @@ pub fn crypto_x25519_public_key(public_key: &mut [u8], secret_key: &[u8]) {
 /// // multiple keys
 /// ```
 pub fn crypto_x25519(
-    raw_shared_secret: &mut [u8],
-    your_secret_key: &[u8],
-    their_public_key: &[u8],
+    raw_shared_secret: &mut [u8; 32],
+    your_secret_key: &[u8; 32],
+    their_public_key: &[u8; 32],
 ) {
-    assert!(raw_shared_secret.len() == 32);
-    assert!(your_secret_key.len() == 32);
-    assert!(their_public_key.len() == 32);
-
     let raw_buf = raw_shared_secret.as_mut_ptr();
     let secret_buf = your_secret_key.as_ptr();
     let pub_buf = their_public_key.as_ptr();

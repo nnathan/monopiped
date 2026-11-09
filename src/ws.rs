@@ -99,7 +99,7 @@ pub async fn proxy_ws_connection(
 
     crypto_aead_lock(
         encrypted_pk_detached,
-        mac,
+        mac.try_into().unwrap(),
         &write_key.key,
         &write_key.nonce,
         None,
@@ -141,7 +141,7 @@ pub async fn proxy_ws_connection(
 
                 if let Err(e) = crypto_aead_unlock(
                     &mut received_pk,
-                    &msg[(ENCRYPTED_HANDSHAKE_BYTES - 16)..],
+                    msg[(ENCRYPTED_HANDSHAKE_BYTES - 16)..].try_into().unwrap(),
                     &read_key.key,
                     &read_key.nonce,
                     None,
@@ -214,7 +214,7 @@ async fn shovel_encrypted<'a>(
 
         crypto_aead_lock(
             ciphertext_detached,
-            mac,
+            mac.try_into().unwrap(),
             &key.key,
             &key.nonce,
             None,
@@ -268,7 +268,7 @@ async fn shovel_decrypted<'a>(
 
                     if let Err(e) = crypto_aead_unlock(
                         &mut plaintext,
-                        &msg[PLAINTEXT_FRAME_BYTES..],
+                        msg[PLAINTEXT_FRAME_BYTES..].try_into().unwrap(),
                         &key.key,
                         &key.nonce,
                         None,
