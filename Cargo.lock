@@ -568,7 +568,7 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "mini-monocypher"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "hex-literal",
  "mini-monocypher-sys",
@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "mini-monocypher-sys"
-version = "0.1.3+monocypher.4.0.3"
+version = "0.1.4+monocypher.4.0.3"
 dependencies = [
  "bindgen",
  "cc",
