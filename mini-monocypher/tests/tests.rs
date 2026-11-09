@@ -208,3 +208,46 @@ fn test_crypto_wipe_erases_only_the_given_slice() {
 fn test_crypto_wipe_accepts_empty_slice() {
     mini_monocypher::crypto_wipe(&mut []);
 }
+
+// RFC 8439 section 2.5.2
+const POLY1305_KEY: [u8; 32] = hex!("85 d6 be 78 57 55 6d 33 7f 44 52 fe 42 d5 06 a8 01 03 80 8a fb 0d b2 fd 4a bf f6 af 41 49 f5 1b");
+const POLY1305_MESSAGE: &[u8] = b"Cryptographic Forum Research Group";
+const POLY1305_MAC: [u8; 16] = hex!("a8 06 1d c1 30 51 36 c6 c2 2b 8b af 0c 01 27 a9");
+
+#[test]
+fn test_crypto_poly1305() {
+    let mut mac = [0u8; 16];
+
+    mini_monocypher::crypto_poly1305(&mut mac, POLY1305_MESSAGE, &POLY1305_KEY);
+
+    assert_eq!(mac, POLY1305_MAC, "incorrect mac");
+}
+
+#[test]
+fn test_crypto_poly1305_incremental_at_every_split() {
+    for i in 0..=POLY1305_MESSAGE.len() {
+        let mut mac = [0u8; 16];
+        let mut ctx = mini_monocypher::crypto_poly1305_ctx_new();
+
+        mini_monocypher::crypto_poly1305_init(&mut ctx, &POLY1305_KEY);
+        mini_monocypher::crypto_poly1305_update(&mut ctx, &POLY1305_MESSAGE[..i]);
+        mini_monocypher::crypto_poly1305_update(&mut ctx, &POLY1305_MESSAGE[i..]);
+        mini_monocypher::crypto_poly1305_final(&mut ctx, &mut mac);
+
+        assert_eq!(mac, POLY1305_MAC, "incorrect mac splitting at {i}");
+    }
+}
+
+#[test]
+fn test_crypto_poly1305_empty_message() {
+    let mut mac = [0u8; 16];
+    let mut incremental_mac = [0u8; 16];
+    let mut ctx = mini_monocypher::crypto_poly1305_ctx_new();
+
+    mini_monocypher::crypto_poly1305(&mut mac, b"", &POLY1305_KEY);
+
+    mini_monocypher::crypto_poly1305_init(&mut ctx, &POLY1305_KEY);
+    mini_monocypher::crypto_poly1305_final(&mut ctx, &mut incremental_mac);
+
+    assert_eq!(mac, incremental_mac, "interfaces disagree");
+}

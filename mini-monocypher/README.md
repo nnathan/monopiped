@@ -16,3 +16,4 @@ The current API supported:
   - `crypto_x25519_*` functions
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
+  - `crypto_poly1305*` functions
