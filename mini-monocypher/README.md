@@ -24,6 +24,18 @@ The bindings differ from C in these ways:
   - The Argon2 algorithm is an enum, usable by the same names as in C.
   - The low-level EdDSA building blocks are in the `hazmat` module.
 
+## History
+
+Before Claude there had been one version of this release, 0.1.0, where mini-monocypher was hand written in the era where LLMs and code generation had not taken over. The plan was always to get to fidelity with the Monocypher API, but it would have been a time consuming task.
+
+In the era of Claude Code and high quality models it made sense to use one here. The quality of the code would be great for a small project like this because incrementally supporting the Monocypher API is very much a mechanical process, and Monocypher itself is incredibly LLM friendly. So I unleashed the LLM on this repository, but because it is cryptography related I reviewed all of the code that was generated.
+
+I stayed in the loop to decide which Rust safety features to use while keeping fidelity with the C API and avoiding idiomatic Rust abstraction which would make the API too foreign for someone that has used Monocypher before.
+
+I can attest that Claude has done a better job than I could ever do and at breakneck speed.
+
+Thanks to Claude, as of version 0.3.0 we have fidelity with Monocypher 4.0.3.
+
 ## Known limitations
 
 Monocypher allows the input and output of some functions, such as encryption
