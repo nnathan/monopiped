@@ -1303,8 +1303,8 @@ pub fn crypto_x25519_inverse(
 /// Generates an X25519 public key for use with Elligator, with smaller code.
 ///
 /// The public key is compatible with [`crypto_x25519`], but this function
-/// leaks 3 bits of the secret key. Only use it when the key will be hidden
-/// with Elligator, otherwise use [`crypto_x25519_public_key`].
+/// leaks 3 bits of the secret key. Only use it for ephemeral keys that will be
+/// hidden with Elligator, otherwise use [`crypto_x25519_public_key`].
 ///
 /// # Examples
 ///
@@ -1328,8 +1328,8 @@ pub fn crypto_x25519_dirty_small(pk: &mut [u8; 32], sk: &[u8; 32]) {
 /// Generates an X25519 public key for use with Elligator, optimised for speed.
 ///
 /// The public key is compatible with [`crypto_x25519`], but this function
-/// leaks 3 bits of the secret key. Only use it when the key will be hidden
-/// with Elligator, otherwise use [`crypto_x25519_public_key`].
+/// leaks 3 bits of the secret key. Only use it for ephemeral keys that will be
+/// hidden with Elligator, otherwise use [`crypto_x25519_public_key`].
 ///
 /// # Examples
 ///
