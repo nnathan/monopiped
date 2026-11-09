@@ -34,6 +34,7 @@ fn main() {
         .allowlist_function("crypto_aead_(init_x|init_djb|init_ietf|write|read)")
         .allowlist_type("crypto_aead_ctx")
         .allowlist_function("crypto_eddsa_(key_pair|sign|check|to_x25519)")
+        .allowlist_function("crypto_eddsa_(trim_scalar|reduce|mul_add|scalarbase|check_equation)")
         .allowlist_function("crypto_x25519_public_key")
         .allowlist_function("crypto_x25519")
         .allowlist_function("crypto_x25519_(to_eddsa|inverse|dirty_small|dirty_fast)")

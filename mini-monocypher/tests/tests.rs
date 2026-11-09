@@ -690,3 +690,56 @@ fn test_x25519_eddsa_conversions() {
         assert_eq!(converted_back, eddsa_public, "key {i}");
     }
 }
+
+fn eddsa_hash_reduce(parts: &[&[u8]]) -> [u8; 32] {
+    let mut hash = [0u8; 64];
+    let mut reduced = [0u8; 32];
+    let mut ctx = mini_monocypher::crypto_blake2b_ctx_new();
+
+    mini_monocypher::crypto_blake2b_init(&mut ctx, 64);
+    for part in parts {
+        mini_monocypher::crypto_blake2b_update(&mut ctx, part);
+    }
+    mini_monocypher::crypto_blake2b_final(&mut ctx, &mut hash);
+    mini_monocypher::hazmat::crypto_eddsa_reduce(&mut reduced, &hash);
+
+    reduced
+}
+
+#[test]
+fn test_crypto_eddsa_building_blocks_rebuild_a_signature() {
+    let message = b"Lorem ipsum";
+
+    for i in 0..32 {
+        let (secret_key, public_key) = eddsa_test_key_pair(i);
+        let mut expanded = [0u8; 64];
+        let mut a = [0u8; 32];
+        let mut derived_public_key = [0u8; 32];
+        let mut big_r = [0u8; 32];
+        let mut s = [0u8; 32];
+        let mut expected = [0u8; 64];
+
+        mini_monocypher::crypto_blake2b(&mut expanded, &secret_key[..32]);
+        mini_monocypher::hazmat::crypto_eddsa_trim_scalar(&mut a, expanded[..32].try_into().unwrap());
+        mini_monocypher::hazmat::crypto_eddsa_scalarbase(&mut derived_public_key, &a);
+        assert_eq!(derived_public_key, public_key, "key {i}");
+
+        let r = eddsa_hash_reduce(&[&expanded[32..], message]);
+        mini_monocypher::hazmat::crypto_eddsa_scalarbase(&mut big_r, &r);
+        let h = eddsa_hash_reduce(&[&big_r, &public_key, message]);
+        mini_monocypher::hazmat::crypto_eddsa_mul_add(&mut s, &h, &a, &r);
+
+        let mut signature = [0u8; 64];
+        signature[..32].copy_from_slice(&big_r);
+        signature[32..].copy_from_slice(&s);
+
+        mini_monocypher::crypto_eddsa_sign(&mut expected, &secret_key, message);
+        assert_eq!(signature, expected, "key {i}");
+
+        assert!(mini_monocypher::hazmat::crypto_eddsa_check_equation(&signature, &public_key, &h).is_ok());
+
+        let wrong_h = eddsa_hash_reduce(&[b"wrong"]);
+        let result = mini_monocypher::hazmat::crypto_eddsa_check_equation(&signature, &public_key, &wrong_h);
+        assert!(matches!(result, Err(mini_monocypher::ErrorKind::InvalidSignature)));
+    }
+}
