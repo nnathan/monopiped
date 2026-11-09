@@ -19,15 +19,23 @@ use std::fmt;
 
 /// Errors returned by Monocypher
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// Decryption failed due to incorrect nonce, integrity failure
     /// in ciphertext, or incorrect MAC.
     AuthenticationFailure,
+    /// A constant time comparison found the inputs are different.
+    Mismatch,
 }
 
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "authentication failure trying to decrypt ciphertext")
+        match self {
+            ErrorKind::AuthenticationFailure => {
+                write!(f, "authentication failure trying to decrypt ciphertext")
+            }
+            ErrorKind::Mismatch => write!(f, "inputs to constant time comparison are different"),
+        }
     }
 }
 
@@ -471,4 +479,128 @@ pub fn crypto_x25519(
     let pub_buf = their_public_key.as_ptr();
 
     unsafe { mini_monocypher_sys::crypto_x25519(raw_buf, secret_buf, pub_buf) }
+}
+
+/// Compares two 16-byte buffers in constant time. Returns `()` if they are
+/// equal, or [`ErrorKind::Mismatch`] if they are different.
+///
+/// Use this instead of `==` when comparing secrets such as MACs, as the time
+/// taken by this function does not depend on the contents of the buffers.
+///
+/// It is recommended to read the [`Monocypher` manual] before using this
+/// function.
+///
+/// # Examples
+///
+/// ```
+/// use mini_monocypher::crypto_verify16;
+///
+/// let a = [1u8; 16];
+/// let b = [1u8; 16];
+/// let c = [2u8; 16];
+///
+/// assert!(crypto_verify16(&a, &b).is_ok());
+/// assert!(crypto_verify16(&a, &c).is_err());
+/// ```
+///
+/// [`Monocypher` manual]: https://monocypher.org/manual/verify
+pub fn crypto_verify16(a: &[u8; 16], b: &[u8; 16]) -> Result<(), ErrorKind> {
+    let a_buf = a.as_ptr();
+    let b_buf = b.as_ptr();
+
+    let result = unsafe { mini_monocypher_sys::crypto_verify16(a_buf, b_buf) };
+
+    if result != 0 {
+        return Err(ErrorKind::Mismatch);
+    }
+
+    Ok(())
+}
+
+/// Compares two 32-byte buffers in constant time. Returns `()` if they are
+/// equal, or [`ErrorKind::Mismatch`] if they are different.
+///
+/// Use this instead of `==` when comparing secrets such as MACs, as the time
+/// taken by this function does not depend on the contents of the buffers.
+///
+/// # Examples
+///
+/// ```
+/// use mini_monocypher::crypto_verify32;
+///
+/// let a = [1u8; 32];
+/// let b = [1u8; 32];
+/// let c = [2u8; 32];
+///
+/// assert!(crypto_verify32(&a, &b).is_ok());
+/// assert!(crypto_verify32(&a, &c).is_err());
+/// ```
+pub fn crypto_verify32(a: &[u8; 32], b: &[u8; 32]) -> Result<(), ErrorKind> {
+    let a_buf = a.as_ptr();
+    let b_buf = b.as_ptr();
+
+    let result = unsafe { mini_monocypher_sys::crypto_verify32(a_buf, b_buf) };
+
+    if result != 0 {
+        return Err(ErrorKind::Mismatch);
+    }
+
+    Ok(())
+}
+
+/// Compares two 64-byte buffers in constant time. Returns `()` if they are
+/// equal, or [`ErrorKind::Mismatch`] if they are different.
+///
+/// Use this instead of `==` when comparing secrets such as MACs, as the time
+/// taken by this function does not depend on the contents of the buffers.
+///
+/// # Examples
+///
+/// ```
+/// use mini_monocypher::crypto_verify64;
+///
+/// let a = [1u8; 64];
+/// let b = [1u8; 64];
+/// let c = [2u8; 64];
+///
+/// assert!(crypto_verify64(&a, &b).is_ok());
+/// assert!(crypto_verify64(&a, &c).is_err());
+/// ```
+pub fn crypto_verify64(a: &[u8; 64], b: &[u8; 64]) -> Result<(), ErrorKind> {
+    let a_buf = a.as_ptr();
+    let b_buf = b.as_ptr();
+
+    let result = unsafe { mini_monocypher_sys::crypto_verify64(a_buf, b_buf) };
+
+    if result != 0 {
+        return Err(ErrorKind::Mismatch);
+    }
+
+    Ok(())
+}
+
+/// Erases `secret` by overwriting it with zeroes, in a way the compiler will
+/// not optimise away.
+///
+/// This only erases the memory `secret` refers to. Copies of the data left
+/// behind when a value was moved or copied are not affected.
+///
+/// It is recommended to read the [`Monocypher` manual] before using this
+/// function.
+///
+/// # Examples
+///
+/// ```
+/// use mini_monocypher::crypto_wipe;
+///
+/// let mut secret = [0x42u8; 32];
+/// crypto_wipe(&mut secret);
+/// assert_eq!(secret, [0u8; 32]);
+/// ```
+///
+/// [`Monocypher` manual]: https://monocypher.org/manual/wipe
+pub fn crypto_wipe(secret: &mut [u8]) {
+    let secret_buf = secret.as_mut_ptr().cast();
+
+    unsafe { mini_monocypher_sys::crypto_wipe(secret_buf, secret.len()) }
 }

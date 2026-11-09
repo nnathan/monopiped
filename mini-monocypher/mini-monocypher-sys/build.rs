@@ -26,6 +26,8 @@ fn main() {
         .allowlist_type("crypto_blake2b_ctx")
         .allowlist_function("crypto_blake2b_(init|update|final)")
         .allowlist_function("crypto_blake2b_keyed_init")
+        .allowlist_function("crypto_verify(16|32|64)")
+        .allowlist_function("crypto_wipe")
         .allowlist_function("crypto_x25519_public_key")
         .allowlist_function("crypto_x25519")
         // Tell cargo to invalidate the built crate whenever any of the

@@ -160,3 +160,51 @@ fn test_crypto_blake2b_final_larger_buffer_writes_hash_size_only() {
     assert_eq!(hash[..32], expected, "incorrect hash");
     assert_eq!(hash[32..], [0u8; 32], "wrote past hash_size");
 }
+
+macro_rules! test_crypto_verify {
+    ($name:ident, $func:ident, $size:expr) => {
+        #[test]
+        fn $name() {
+            let a = [0x5au8; $size];
+            assert!(mini_monocypher::$func(&a, &a).is_ok());
+
+            for i in 0..$size {
+                let mut b = a;
+                b[i] ^= 1;
+                assert!(mini_monocypher::$func(&a, &b).is_err(), "byte {i}");
+            }
+        }
+    };
+}
+
+test_crypto_verify!(test_crypto_verify16, crypto_verify16, 16);
+test_crypto_verify!(test_crypto_verify32, crypto_verify32, 32);
+test_crypto_verify!(test_crypto_verify64, crypto_verify64, 64);
+
+#[test]
+fn test_crypto_verify_returns_mismatch() {
+    let result = mini_monocypher::crypto_verify16(&[0u8; 16], &[1u8; 16]);
+    assert!(matches!(result, Err(mini_monocypher::ErrorKind::Mismatch)));
+}
+
+#[test]
+fn test_authentication_failure_message_is_unchanged() {
+    assert_eq!(
+        mini_monocypher::ErrorKind::AuthenticationFailure.to_string(),
+        "authentication failure trying to decrypt ciphertext"
+    );
+}
+
+#[test]
+fn test_crypto_wipe_erases_only_the_given_slice() {
+    let mut buf = [0xffu8; 8];
+
+    mini_monocypher::crypto_wipe(&mut buf[2..6]);
+
+    assert_eq!(buf, [0xff, 0xff, 0, 0, 0, 0, 0xff, 0xff]);
+}
+
+#[test]
+fn test_crypto_wipe_accepts_empty_slice() {
+    mini_monocypher::crypto_wipe(&mut []);
+}
