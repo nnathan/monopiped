@@ -796,3 +796,136 @@ fn test_crypto_elligator_rev() {
 
     assert!(hidden_count > 0 && unsuitable_count > 0);
 }
+
+mod argon2 {
+    use hex_literal::hex;
+    use mini_monocypher::{
+        crypto_argon2, crypto_argon2_config, crypto_argon2_extras, crypto_argon2_inputs,
+        crypto_argon2_no_extras, CRYPTO_ARGON2_D, CRYPTO_ARGON2_I, CRYPTO_ARGON2_ID,
+    };
+
+    const PASS: [u8; 32] = [1u8; 32];
+    const SALT: [u8; 16] = [2u8; 16];
+    const KEY: [u8; 8] = [3u8; 8];
+    const AD: [u8; 12] = [4u8; 12];
+
+    fn config() -> crypto_argon2_config {
+        crypto_argon2_config {
+            algorithm: CRYPTO_ARGON2_I,
+            nb_blocks: 8,
+            nb_passes: 1,
+            nb_lanes: 1,
+        }
+    }
+
+    fn inputs() -> crypto_argon2_inputs<'static> {
+        crypto_argon2_inputs {
+            pass: &PASS,
+            salt: &SALT,
+        }
+    }
+
+    fn hash(extras: crypto_argon2_extras) -> [u8; 32] {
+        let mut hash = [0u8; 32];
+        crypto_argon2(&mut hash, &mut [0u64; 8 * 128], config(), inputs(), extras);
+        hash
+    }
+
+    // RFC 9106 section 5
+    macro_rules! rfc_vector {
+        ($name:ident, $algorithm:expr, $expected:literal) => {
+            #[test]
+            fn $name() {
+                let config = crypto_argon2_config {
+                    algorithm: $algorithm,
+                    nb_blocks: 32,
+                    nb_passes: 3,
+                    nb_lanes: 4,
+                };
+                let extras = crypto_argon2_extras {
+                    key: Some(&KEY),
+                    ad: Some(&AD),
+                };
+                let mut hash = [0u8; 32];
+                let mut work_area = [0u64; 32 * 128];
+
+                crypto_argon2(&mut hash, &mut work_area, config, inputs(), extras);
+
+                assert_eq!(hash, hex!($expected), "incorrect hash");
+            }
+        };
+    }
+
+    rfc_vector!(rfc_9106_argon2d, CRYPTO_ARGON2_D, "51 2b 39 1b 6f 11 62 97 53 71 d3 09 19 73 42 94 f8 68 e3 be 39 84 f3 c1 a1 3a 4d b9 fa be 4a cb");
+    rfc_vector!(rfc_9106_argon2i, CRYPTO_ARGON2_I, "c8 14 d9 d1 dc 7f 37 aa 13 f0 d7 7f 24 94 bd a1 c8 de 6b 01 6d d3 88 d2 99 52 a4 c4 67 2b 6c e8");
+    rfc_vector!(rfc_9106_argon2id, CRYPTO_ARGON2_ID, "0d 64 0d f5 8d 78 76 6c 08 c0 37 a3 4a 8b 53 c9 d0 1e f0 45 2d 75 b6 5e b5 25 20 e9 6b 01 e6 59");
+
+    #[test]
+    fn extras_change_the_hash() {
+        let with_key = crypto_argon2_extras {
+            key: Some(&KEY),
+            ad: None,
+        };
+        let with_ad = crypto_argon2_extras {
+            key: None,
+            ad: Some(&AD),
+        };
+        let none = hash(crypto_argon2_no_extras);
+
+        assert_ne!(none, hash(with_key));
+        assert_ne!(none, hash(with_ad));
+        assert_ne!(hash(with_key), hash(with_ad));
+    }
+
+    #[test]
+    fn empty_extras_are_the_same_as_none() {
+        let empty = crypto_argon2_extras {
+            key: Some(&[]),
+            ad: Some(&[]),
+        };
+
+        assert_eq!(hash(empty), hash(crypto_argon2_no_extras));
+    }
+
+    #[test]
+    fn work_area_is_wiped() {
+        let mut hash = [0u8; 32];
+        let mut work_area = [0xffu64; 8 * 128];
+
+        crypto_argon2(&mut hash, &mut work_area, config(), inputs(), crypto_argon2_no_extras);
+
+        assert!(work_area.iter().all(|x| *x == 0), "work area was not wiped");
+    }
+
+    #[test]
+    fn larger_work_area_is_accepted() {
+        let mut other = [0u8; 32];
+
+        crypto_argon2(&mut other, &mut [0u64; 9 * 128], config(), inputs(), crypto_argon2_no_extras);
+
+        assert_eq!(other, hash(crypto_argon2_no_extras));
+    }
+
+    macro_rules! rejects {
+        ($name:ident, $work_blocks:expr, $inputs:expr, $($field:ident: $value:expr),*) => {
+            #[test]
+            #[should_panic]
+            fn $name() {
+                let mut hash = [0u8; 32];
+                let mut work_area = vec![0u64; $work_blocks * 128];
+                let config = crypto_argon2_config {
+                    $($field: $value,)*
+                    ..config()
+                };
+
+                crypto_argon2(&mut hash, &mut work_area, config, $inputs, crypto_argon2_no_extras);
+            }
+        };
+    }
+
+    rejects!(rejects_zero_lanes, 8, inputs(), nb_lanes: 0);
+    rejects!(rejects_zero_passes, 8, inputs(), nb_passes: 0);
+    rejects!(rejects_too_few_blocks_for_lanes, 16, inputs(), nb_blocks: 15, nb_lanes: 2);
+    rejects!(rejects_small_work_area, 7, inputs(), nb_blocks: 8);
+    rejects!(rejects_short_salt, 8, crypto_argon2_inputs { pass: &PASS, salt: &[0u8; 7] }, nb_blocks: 8);
+}
