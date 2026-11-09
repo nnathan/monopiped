@@ -13,7 +13,8 @@ The current API supported:
 
   - `crypto_blake2b_*` functions
   - `crypto_aead_{lock,unlock}`
-  - `crypto_x25519_*` functions
+  - `crypto_x25519`
+  - `crypto_x25519_public_key`
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions
