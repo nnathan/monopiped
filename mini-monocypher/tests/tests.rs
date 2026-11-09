@@ -375,3 +375,44 @@ macro_rules! test_crypto_chacha20 {
 test_crypto_chacha20!(chacha20_djb, crypto_chacha20_djb, 8);
 test_crypto_chacha20!(chacha20_ietf, crypto_chacha20_ietf, 12);
 test_crypto_chacha20!(chacha20_x, crypto_chacha20_x, 24);
+
+macro_rules! test_ctx_wiped_on_drop {
+    ($name:ident, $ty:ident, $new:ident, |$ctx:ident| $init:block) => {
+        #[test]
+        fn $name() {
+            let mut $ctx = std::mem::ManuallyDrop::new(mini_monocypher::$new());
+            $init
+
+            let bytes = |c: &mini_monocypher::$ty| unsafe {
+                std::slice::from_raw_parts(
+                    c as *const mini_monocypher::$ty as *const u8,
+                    std::mem::size_of::<mini_monocypher::$ty>(),
+                )
+                .to_vec()
+            };
+            assert!(bytes(&$ctx).iter().any(|b| *b != 0), "context was not set up");
+
+            unsafe { std::mem::ManuallyDrop::drop(&mut $ctx) };
+
+            assert!(bytes(&$ctx).iter().all(|b| *b == 0), "context was not wiped");
+        }
+    };
+}
+
+test_ctx_wiped_on_drop!(
+    test_crypto_blake2b_ctx_wiped_on_drop,
+    crypto_blake2b_ctx,
+    crypto_blake2b_ctx_new,
+    |ctx| {
+        mini_monocypher::crypto_blake2b_keyed_init(&mut ctx, 32, &[1u8; 32]);
+    }
+);
+
+test_ctx_wiped_on_drop!(
+    test_crypto_poly1305_ctx_wiped_on_drop,
+    crypto_poly1305_ctx,
+    crypto_poly1305_ctx_new,
+    |ctx| {
+        mini_monocypher::crypto_poly1305_init(&mut ctx, &[1u8; 32]);
+    }
+);

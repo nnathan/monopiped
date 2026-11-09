@@ -125,8 +125,25 @@ pub fn crypto_blake2b_keyed(hash: &mut [u8], key: &[u8], message: &[u8]) {
 /// BLAKE2b context for use with incremental interface.
 ///
 /// The contents are private as Monocypher trusts them when writing to memory.
+///
+/// As added safety over Monocypher, the context is also wiped when it goes out
+/// of scope, which covers a context abandoned before [`crypto_blake2b_final`].
+/// Copies left behind when the context was moved are not affected.
 #[repr(transparent)]
 pub struct crypto_blake2b_ctx(mini_monocypher_sys::crypto_blake2b_ctx);
+
+impl Drop for crypto_blake2b_ctx {
+    fn drop(&mut self) {
+        let ctx_ptr = &mut self.0 as *mut mini_monocypher_sys::crypto_blake2b_ctx;
+
+        unsafe {
+            mini_monocypher_sys::crypto_wipe(
+                ctx_ptr.cast(),
+                std::mem::size_of::<mini_monocypher_sys::crypto_blake2b_ctx>(),
+            );
+        }
+    }
+}
 
 /// Returns a BLAKE2b context for use with the incremental interface.
 /// Needs to be initialised with [`crypto_blake2b_init`].
@@ -649,8 +666,25 @@ pub fn crypto_poly1305(mac: &mut [u8; 16], message: &[u8], key: &[u8; 32]) {
 /// Poly1305 context for use with incremental interface.
 ///
 /// The contents are private as Monocypher trusts them when writing to memory.
+///
+/// As added safety over Monocypher, the context is also wiped when it goes out
+/// of scope, which covers a context abandoned before [`crypto_poly1305_final`].
+/// Copies left behind when the context was moved are not affected.
 #[repr(transparent)]
 pub struct crypto_poly1305_ctx(mini_monocypher_sys::crypto_poly1305_ctx);
+
+impl Drop for crypto_poly1305_ctx {
+    fn drop(&mut self) {
+        let ctx_ptr = &mut self.0 as *mut mini_monocypher_sys::crypto_poly1305_ctx;
+
+        unsafe {
+            mini_monocypher_sys::crypto_wipe(
+                ctx_ptr.cast(),
+                std::mem::size_of::<mini_monocypher_sys::crypto_poly1305_ctx>(),
+            );
+        }
+    }
+}
 
 /// Returns a Poly1305 context for use with the incremental interface.
 ///
