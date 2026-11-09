@@ -39,6 +39,35 @@ fn test_crypto_blake2b_keyed() {
 }
 
 #[test]
+fn test_crypto_blake2b_keyed_incremental() {
+    let mut hash = [0u8; 32];
+    let key = hex!("aabbccdd");
+    let expected = hex!("b7 6a de 2d 06 d3 e5 6a 1e e5 78 9d 25 1c c9 bb 75 b4 27 0f e5 9c 5e c0 76 8a 4f bb ca 59 ce 8a");
+
+    let mut ctx = mini_monocypher::crypto_blake2b_ctx_new();
+    mini_monocypher::crypto_blake2b_keyed_init(&mut ctx, 32, &key);
+    mini_monocypher::crypto_blake2b_update(&mut ctx, b"Lorem");
+    mini_monocypher::crypto_blake2b_update(&mut ctx, b" ");
+    mini_monocypher::crypto_blake2b_update(&mut ctx, b"ipsum");
+    mini_monocypher::crypto_blake2b_final(&mut ctx, &mut hash);
+    assert_eq!(hash, expected, "incorrect hash");
+}
+
+#[test]
+#[should_panic]
+fn test_crypto_blake2b_keyed_init_rejects_long_key() {
+    let mut ctx = mini_monocypher::crypto_blake2b_ctx_new();
+    mini_monocypher::crypto_blake2b_keyed_init(&mut ctx, 32, &[0u8; 65]);
+}
+
+#[test]
+#[should_panic]
+fn test_crypto_blake2b_keyed_init_rejects_bad_hash_size() {
+    let mut ctx = mini_monocypher::crypto_blake2b_ctx_new();
+    mini_monocypher::crypto_blake2b_keyed_init(&mut ctx, 65, b"key");
+}
+
+#[test]
 fn test_crypto_aead_lock() {
     let key = hex!("00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f");
     let nonce = [0u8; 24];
