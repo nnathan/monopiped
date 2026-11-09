@@ -18,6 +18,7 @@ The current API supported:
   - `crypto_x25519_public_key`
   - `crypto_x25519_{to_eddsa,inverse,dirty_small,dirty_fast}`
   - `crypto_eddsa_*` functions (the low-level building blocks are in the `hazmat` module)
+  - `crypto_elligator_*` functions
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions

@@ -743,3 +743,56 @@ fn test_crypto_eddsa_building_blocks_rebuild_a_signature() {
         assert!(matches!(result, Err(mini_monocypher::ErrorKind::InvalidSignature)));
     }
 }
+
+#[test]
+fn test_crypto_elligator_key_pair() {
+    for i in 0..32 {
+        let mut seed = x25519_test_key(i);
+        let mut hidden = [0u8; 32];
+        let mut secret_key = [0u8; 32];
+        let mut curve = [0u8; 32];
+        let mut public_key = [0u8; 32];
+
+        mini_monocypher::crypto_elligator_key_pair(&mut hidden, &mut secret_key, &mut seed);
+        assert_eq!(seed, [0u8; 32], "seed was not wiped");
+
+        mini_monocypher::crypto_elligator_map(&mut curve, &hidden);
+        mini_monocypher::crypto_x25519_dirty_fast(&mut public_key, &secret_key);
+        assert_eq!(curve, public_key, "key {i}");
+    }
+}
+
+#[test]
+fn test_crypto_elligator_rev() {
+    let (mut hidden_count, mut unsuitable_count) = (0, 0);
+
+    for i in 0..64 {
+        let mut public_key = [0u8; 32];
+        let mut hidden = [0u8; 32];
+        let mut same_hidden = [0u8; 32];
+        let mut other_tweak_hidden = [0u8; 32];
+
+        mini_monocypher::crypto_x25519_dirty_fast(&mut public_key, &x25519_test_key(i));
+
+        let result = mini_monocypher::crypto_elligator_rev(&mut hidden, &public_key, 1);
+        let other_tweak = mini_monocypher::crypto_elligator_rev(&mut other_tweak_hidden, &public_key, 0xc2);
+        assert_eq!(result.is_ok(), other_tweak.is_ok(), "the tweak must not matter, key {i}");
+
+        match result {
+            Err(mini_monocypher::ErrorKind::UnsuitableForHiding) => unsuitable_count += 1,
+            Err(e) => panic!("unexpected error: {e}"),
+            Ok(()) => {
+                hidden_count += 1;
+                let mut curve = [0u8; 32];
+                mini_monocypher::crypto_elligator_map(&mut curve, &hidden);
+                assert_eq!(curve, public_key, "key {i}");
+
+                mini_monocypher::crypto_elligator_rev(&mut same_hidden, &public_key, 1)
+                    .expect("a suitable key always succeeds");
+                assert_eq!(hidden, same_hidden, "key {i}");
+            }
+        }
+    }
+
+    assert!(hidden_count > 0 && unsuitable_count > 0);
+}
