@@ -106,3 +106,28 @@ fn test_crypto_x25519() {
 
     assert_eq!(shared, expected, "incorrect shared x25519 value");
 }
+
+#[test]
+#[should_panic]
+fn test_crypto_blake2b_final_rejects_buffer_shorter_than_hash_size() {
+    let mut hash = [0u8; 32];
+    let mut ctx = mini_monocypher::crypto_blake2b_ctx_new();
+
+    mini_monocypher::crypto_blake2b_init(&mut ctx, 64);
+    mini_monocypher::crypto_blake2b_update(&mut ctx, b"Lorem ipsum");
+    mini_monocypher::crypto_blake2b_final(&mut ctx, &mut hash);
+}
+
+#[test]
+fn test_crypto_blake2b_final_larger_buffer_writes_hash_size_only() {
+    let mut hash = [0u8; 64];
+    let expected = hex!("85 a6 d0 b4 bb 3f dc cf 60 e3 06 65 b7 69 49 7c 54 d9 42 2e 01 84 07 76 80 1e 09 4f 04 3f ff 41");
+
+    let mut ctx: mini_monocypher::crypto_blake2b_ctx = mini_monocypher::crypto_blake2b_ctx_new();
+    mini_monocypher::crypto_blake2b_init(&mut ctx, 32);
+    mini_monocypher::crypto_blake2b_update(&mut ctx, b"Lorem ipsum");
+    mini_monocypher::crypto_blake2b_final(&mut ctx, &mut hash);
+
+    assert_eq!(hash[..32], expected, "incorrect hash");
+    assert_eq!(hash[32..], [0u8; 32], "wrote past hash_size");
+}

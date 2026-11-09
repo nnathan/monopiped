@@ -115,18 +115,21 @@ pub fn crypto_blake2b_keyed(hash: &mut [u8], key: &[u8], message: &[u8]) {
 }
 
 /// BLAKE2b context for use with incremental interface.
-type crypto_blake2b_ctx = mini_monocypher_sys::crypto_blake2b_ctx;
+///
+/// The contents are private as Monocypher trusts them when writing to memory.
+#[repr(transparent)]
+pub struct crypto_blake2b_ctx(mini_monocypher_sys::crypto_blake2b_ctx);
 
 /// Returns a BLAKE2b context for use with the incremental interface.
 /// Needs to be initialised with [`crypto_blake2b_init`].
 pub fn crypto_blake2b_ctx_new() -> crypto_blake2b_ctx {
-    crypto_blake2b_ctx {
+    crypto_blake2b_ctx(mini_monocypher_sys::crypto_blake2b_ctx {
         hash: [0u64; 8],
         input_offset: [0u64; 2],
         input: [0u64; 16],
         input_idx: 0,
         hash_size: 0,
-    }
+    })
 }
 
 /// Initialises a BLAKE2B context for use with the incremental interface.
@@ -164,7 +167,7 @@ pub fn crypto_blake2b_ctx_new() -> crypto_blake2b_ctx {
 pub fn crypto_blake2b_init(ctx: &mut crypto_blake2b_ctx, hash_size: usize) {
     assert!(hash_size > 0 && hash_size <= 64);
 
-    let ctx_ptr = ctx as *mut crypto_blake2b_ctx;
+    let ctx_ptr = &mut ctx.0 as *mut mini_monocypher_sys::crypto_blake2b_ctx;
 
     unsafe {
         mini_monocypher_sys::crypto_blake2b_init(ctx_ptr, hash_size);
@@ -176,7 +179,7 @@ pub fn crypto_blake2b_init(ctx: &mut crypto_blake2b_ctx, hash_size: usize) {
 /// See [`crypto_blake2b_init`] for a full example of using the incremental
 /// interface.
 pub fn crypto_blake2b_update(ctx: &mut crypto_blake2b_ctx, message: &[u8]) {
-    let ctx_ptr = ctx as *mut crypto_blake2b_ctx;
+    let ctx_ptr = &mut ctx.0 as *mut mini_monocypher_sys::crypto_blake2b_ctx;
     let message_buf = message.as_ptr();
 
     unsafe {
@@ -195,10 +198,12 @@ pub fn crypto_blake2b_update(ctx: &mut crypto_blake2b_ctx, message: &[u8]) {
 ///
 /// # Panics
 ///
-/// This function will panic if `hash.len()` is >64.
+/// This function will panic if `hash.len()` is >64 or is less than the
+/// `hash_size` specified in [`crypto_blake2b_init`].
 pub fn crypto_blake2b_final(ctx: &mut crypto_blake2b_ctx, hash: &mut [u8]) {
     assert!(hash.len() > 0 && hash.len() <= 64);
-    let ctx_ptr = ctx as *mut crypto_blake2b_ctx;
+    assert!(hash.len() >= ctx.0.hash_size);
+    let ctx_ptr = &mut ctx.0 as *mut mini_monocypher_sys::crypto_blake2b_ctx;
     let hash_buf = hash.as_mut_ptr();
 
     unsafe {
