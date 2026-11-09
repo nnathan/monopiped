@@ -13,3 +13,4 @@ The current bindings are generated:
   - `crypto_verify{16,32,64}`
   - `crypto_wipe`
   - `crypto_poly1305*` functions
+  - `crypto_chacha20_{h,djb,ietf,x}`

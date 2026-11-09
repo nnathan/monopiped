@@ -251,3 +251,127 @@ fn test_crypto_poly1305_empty_message() {
 
     assert_eq!(mac, incremental_mac, "interfaces disagree");
 }
+
+// RFC 8439 section 2.4.2
+const CHACHA20_PLAIN_TEXT: &[u8] = b"Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.";
+
+#[test]
+fn test_crypto_chacha20_ietf() {
+    let key = hex!("00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f");
+    let nonce = hex!("00 00 00 00 00 00 00 4a 00 00 00 00");
+    let expected = hex!(
+        "6e 2e 35 9a 25 68 f9 80 41 ba 07 28 dd 0d 69 81 e9 7e 7a ec 1d 43 60 c2 0a 27 af cc fd 9f ae 0b"
+        "f9 1b 65 c5 52 47 33 ab 8f 59 3d ab cd 62 b3 57 16 39 d6 24 e6 51 52 ab 8f 53 0c 35 9f 08 61 d8"
+        "07 ca 0d bf 50 0d 6a 61 56 a3 8e 08 8a 22 b6 5e 52 bc 51 4d 16 cc f8 06 81 8c e9 1a b7 79 37 36"
+        "5a f9 0b bf 74 a3 5b e6 b4 0b 8e ed f2 78 5e 42 87 4d"
+    );
+    let mut cipher_text = [0u8; 114];
+
+    let ctr = mini_monocypher::crypto_chacha20_ietf(
+        &mut cipher_text,
+        Some(CHACHA20_PLAIN_TEXT),
+        &key,
+        &nonce,
+        1,
+    );
+
+    assert_eq!(cipher_text, expected, "incorrect ciphertext");
+    assert_eq!(ctr, 3, "incorrect counter");
+}
+
+#[test]
+fn test_crypto_chacha20_h() {
+    let key = hex!("00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f");
+    let input = hex!("00 00 00 09 00 00 00 4a 00 00 00 00 31 41 59 27");
+    let expected = hex!("82 41 3b 42 27 b2 7b fe d3 0e 42 50 8a 87 7d 73 a0 f9 e4 d5 8a 74 a8 53 c1 2e c4 13 26 d3 ec dc");
+    let mut out = [0u8; 32];
+
+    mini_monocypher::crypto_chacha20_h(&mut out, &key, &input);
+
+    assert_eq!(out, expected, "incorrect output");
+}
+
+macro_rules! test_crypto_chacha20 {
+    ($module:ident, $func:ident, $nonce_size:expr) => {
+        mod $module {
+            use mini_monocypher::$func;
+
+            const KEY: [u8; 32] = [1u8; 32];
+            const NONCE: [u8; $nonce_size] = [2u8; $nonce_size];
+
+            #[test]
+            fn none_is_the_stream_for_all_of_cipher_text() {
+                let mut stream = [0xffu8; 100];
+                let mut encrypted_zeroes = [0xffu8; 100];
+
+                let a = $func(&mut stream, None, &KEY, &NONCE, 0);
+                let b = $func(&mut encrypted_zeroes, Some(&[0u8; 100]), &KEY, &NONCE, 0);
+
+                assert_eq!(stream, encrypted_zeroes);
+                assert_eq!(a, b);
+            }
+
+            #[test]
+            fn empty_plain_text_writes_nothing() {
+                let mut cipher_text = [0xffu8; 16];
+
+                let ctr = $func(&mut cipher_text, Some(&[]), &KEY, &NONCE, 7);
+
+                assert_eq!(cipher_text, [0xffu8; 16]);
+                assert_eq!(ctr, 7);
+            }
+
+            #[test]
+            fn round_trip() {
+                let plain_text = b"Lorem ipsum";
+                let mut cipher_text = [0u8; 11];
+                let mut decrypted = [0u8; 11];
+
+                $func(&mut cipher_text, Some(plain_text), &KEY, &NONCE, 0);
+                $func(&mut decrypted, Some(&cipher_text), &KEY, &NONCE, 0);
+
+                assert_ne!(&cipher_text, plain_text);
+                assert_eq!(&decrypted, plain_text);
+            }
+
+            #[test]
+            fn returned_counter_continues_the_stream() {
+                let mut whole = [0u8; 128];
+                let mut parts = [0u8; 128];
+
+                $func(&mut whole, None, &KEY, &NONCE, 0);
+                let (first, second) = parts.split_at_mut(64);
+                let ctr = $func(first, None, &KEY, &NONCE, 0);
+                assert_eq!(ctr, 1);
+                $func(second, None, &KEY, &NONCE, ctr);
+
+                assert_eq!(whole, parts);
+            }
+
+            #[test]
+            fn longer_cipher_text_leaves_the_rest_untouched() {
+                let mut exact = [0u8; 11];
+                let mut longer = [0xffu8; 16];
+
+                let a = $func(&mut exact, Some(b"Lorem ipsum"), &KEY, &NONCE, 0);
+                let b = $func(&mut longer, Some(b"Lorem ipsum"), &KEY, &NONCE, 0);
+
+                assert_eq!(longer[..11], exact);
+                assert_eq!(longer[11..], [0xffu8; 5]);
+                assert_eq!(a, b);
+            }
+
+            #[test]
+            #[should_panic]
+            fn rejects_short_cipher_text() {
+                let mut cipher_text = [0u8; 10];
+
+                $func(&mut cipher_text, Some(b"Lorem ipsum"), &KEY, &NONCE, 0);
+            }
+        }
+    };
+}
+
+test_crypto_chacha20!(chacha20_djb, crypto_chacha20_djb, 8);
+test_crypto_chacha20!(chacha20_ietf, crypto_chacha20_ietf, 12);
+test_crypto_chacha20!(chacha20_x, crypto_chacha20_x, 24);
